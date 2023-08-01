@@ -1,0 +1,297 @@
+---
+title: "Sheep Androgen Clock Construction - Array"
+author: "Victoria Sugrue"
+date: 'Last updated: 10 July 2023'
+output:
+  word_document:
+    toc: yes
+    toc_depth: '6'
+  html_document:
+    toc: yes
+    toc_float: yes
+    toc_depth: 6
+  pdf_document:
+    toc: yes
+    toc_depth: 5
+    df_print: kable
+    latex_engine: xelatex
+subtitle: ' '
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load required packages
+```{r}
+library(ggplot2)
+library(caret)
+library(dplyr)
+library(Manu)
+library(knitr)
+library(lmtest)
+library(ggfortify)
+```
+
+# Data preparation
+```{r}
+#read in minfi normalised beta values
+sheep_array_cg215241162 <- read.csv("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Data/array_cg21524116.csv", header=FALSE)
+
+#transpose the dataframe and remove unneeded columns
+sheep_array_cg21524116 <- as.data.frame(t(sheep_array_cg215241162[,-c(1:2)]))
+
+#read in file for headers and transpose it, assign the headers to the minfi normalised data
+headers <- read.csv("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Data/array_headers.csv", header=FALSE)
+theaders <- as.list(t(headers))
+names(sheep_array_cg21524116) <- theaders
+
+#remove blood
+sheep_array_cg21524116_ear <- sheep_array_cg21524116 %>% filter(!(Sex=="Blood"))
+#remove "CanBeUsedInAgingStudied==NO"
+sheep_array_cg21524116_ear <- sheep_array_cg21524116_ear %>% filter(!(ExternalSampleID=="RAM_H8_2764_2018"))
+sheep_array_cg21524116_ear <- sheep_array_cg21524116_ear %>% filter(!(ExternalSampleID=="RAM_H5_2777_2018"))
+
+# Setting AndroAge with predicted time of puberty onset = age minus 0.5 years (i.e estimate to reach puberty at 6 months)
+sheep_array_cg21524116_ear$YPMP <- as.numeric(sheep_array_cg21524116_ear$Age)-0.5
+sheep_array_cg21524116_ear$YPMP[sheep_array_cg21524116_ear$Sex=="Wether"] <- 0
+sheep_array_cg21524116_ear$YPMP[sheep_array_cg21524116_ear$Sex=="Ewe"] <- 0
+
+# Subset by sex/castration status
+ram_array_ear_data <- sheep_array_cg21524116_ear %>% filter(Sex=="Ram")
+wether_array_ear_data <- sheep_array_cg21524116_ear %>% filter(Sex=="Wether")
+ewe_array_ear_data <- sheep_array_cg21524116_ear %>% filter(Sex=="Ewe")
+
+```
+
+# A birds-eye view of the data 
+
+```{r}
+# Age distribution
+age_dist_ARRAY <- ggplot(sheep_array_cg21524116_ear, aes(x = as.numeric(Age))) +
+  geom_histogram(aes(fill = Sex), position = "dodge", alpha = 1, bins = 20) +
+  scale_fill_manual(values = get_pal("Takahe")[c(1,2,4)]) +
+  theme_light() +
+  labs(title = "Distribution of age by sex (Sheep ear, Array)", fill = "Sex", x="Age (Years)") +
+  ylab("Frequency")
+age_dist_ARRAY
+```
+
+# Plotting methylation data
+
+```{r}
+MKLN1_sheep_ARRAY <- ggplot(sheep_array_cg21524116_ear, aes(x=as.numeric(Age), y=as.numeric(cg21524116)*100, colour=Sex)) +
+  geom_jitter(width=0.1, size=4, alpha=2/3) +
+  geom_smooth(method="lm") +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2,4)]) +
+  theme_light() +
+  labs(title = "Methylation at cg21524116, Array", colour="Sex", y="Methylation (%)", x="Age (Years)")
+MKLN1_sheep_ARRAY
+```
+
+
+# Fitting model to array data, sheep ear only
+
+```{r}
+# Run model, array data, training on rams
+model_array1 <- lm(YPMP ~ as.numeric(cg21524116), data=ram_array_ear_data)
+summary(model_array1)
+
+```
+
+# Diagnostic plots
+
+```{r}
+autoplot(model_array1, which=c(1,2,3,5), size=3, alpha=4/5, colour="#313657", smooth.colour="#DD3C51", smooth.linetype="dashed", label.size = 3) + theme_light() + theme(plot.title = element_text(color = "white"))
+```
+
+
+
+
+```{r}
+fitted_array <- as.data.frame(model_array1$fitted.values)
+fitted_array["YPMP"] <- ram_array_ear_data$YPMP
+fitted_array$YPMP <- as.numeric(fitted_array$YPMP)
+fitted_array$Fit_AndroAge <- as.numeric(fitted_array$`model_array1$fitted.values`)
+fitted_array$Age <- ram_array_ear_data$Age
+```
+
+# Calculating error
+## All
+
+```{r}
+MAE_model_array1 <- as.data.frame(Metrics::mdae(actual=fitted_array$YPMP, predicted=fitted_array$Fit_AndroAge))
+MAE_model_array1 # 0.228
+```
+
+
+# Testing the model fit further: 
+
+# Breusch-Pagan test of variance (homo/heteroscedasticity)
+
+```{r}
+plot(model_array1$residuals)
+bptest(model_array1)
+```
+
+# 0.4728
+
+# Shapiro-Wilk test of normality
+
+```{r}
+shapiro.test(model_array1$residuals)
+```
+
+# 9.55e-05
+
+# Leave-one-out cross validation
+
+```{r}
+ram_array_ear_data$cg21524116 <- as.numeric(ram_array_ear_data$cg21524116)
+ram_array_ear_data$YPMP <- as.numeric(ram_array_ear_data$YPMP)
+ctrl <- trainControl(method="LOOCV")
+RamLOO_ARRAY <- train(YPMP ~ cg21524116, data=ram_array_ear_data, method="lm", trControl=ctrl)
+summary(RamLOO_ARRAY)
+```
+
+```{r}
+print(RamLOO_ARRAY)
+```
+
+```{r}
+fittedLOO_ARRAY <- as.data.frame(RamLOO_ARRAY$pred)
+fittedLOO_ARRAY["YPMP"] <- ram_array_ear_data$YPMP
+
+RamLOO_ARRAY_MAE <- as.data.frame(Metrics::mdae(actual=fittedLOO_ARRAY$YPMP, predicted=fittedLOO_ARRAY$pred))
+RamLOO_ARRAY_MAE # 0.231
+```
+
+```{r}
+cor(fittedLOO_ARRAY$obs, fittedLOO_ARRAY$pred, method="pearson")
+# 0.941
+
+
+ramLOOfit_array <- ggplot(fittedLOO_ARRAY, aes(x=obs, y=pred)) +
+  geom_point(size=4, alpha=3/4, colour="#313657") + 
+  geom_smooth(method="lm", se=F, colour="#DD3C51") +
+  geom_abline(linetype="dashed") +
+  theme_light() +
+  ylab("Model AndroAge (Years)") +
+  xlab("Years Post Male Puberty (YPMP)") +
+  labs(title = "Ram androgen clock fit (Array)",
+              subtitle = "MAE=0.231, cor=0.941") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5))
+ramLOOfit_array
+```
+
+
+
+
+# Now, to include ewes and wethers.
+
+```{r}
+ewe_array_ear_data$Model_AndroAge <- predict(model_array1, newdata = ewe_array_ear_data)
+
+ewe_MAE_ARRAY <- as.data.frame(Metrics::mdae(actual=ewe_array_ear_data$YPMP, predicted=ewe_array_ear_data$Model_AndroAge))
+ewe_MAE_ARRAY
+# Ewe MAE = 0.255 years
+```
+
+
+```{r}
+wether_array_ear_data$Model_AndroAge <- predict(model_array1, newdata = wether_array_ear_data)
+
+wether_MAE_ARRAY <- as.data.frame(Metrics::mdae(actual=wether_array_ear_data$YPMP, predicted=wether_array_ear_data$Model_AndroAge))
+wether_MAE_ARRAY
+# Wether MAE = 0.314 years
+
+ewewether_array <- rbind(ewe_array_ear_data, wether_array_ear_data)
+
+ewewether_array_violin <- ggplot(ewewether_array, aes(x=Sex, y=Model_AndroAge, fill=Sex)) +
+  geom_violin() + 
+  geom_point(size=4, alpha=3/4, shape=1) +
+  theme_light() +
+    scale_fill_manual(values = get_pal("Takahe")[c(1,4)]) +
+  geom_hline(yintercept = 0, linetype="dashed") +
+  ylab("AndroAge predicted by model (Years)") +
+  xlab("Sex") +
+  ylab("Model AndroAge (Years)") +
+  xlab("Sex") +
+  labs(title = "Ewe and wether androgen clock fit (Array), trained on all rams",
+              subtitle = "Ewe MAE=0.255, Wether MAE=0.314") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+  theme(legend.position = "none")
+ewewether_array_violin
+
+```
+
+# LOOCV across whole dataset
+```{r}
+sheep_array_cg21524116_ear$cg21524116 <- as.numeric(sheep_array_cg21524116_ear$cg21524116)
+sheep_array_cg21524116_ear$YPMP <- as.numeric(sheep_array_cg21524116_ear$YPMP)
+ram_array_ear_data$cg21524116 <- as.numeric(ram_array_ear_data$cg21524116)
+ram_array_ear_data$YPMP <- as.numeric(ram_array_ear_data$YPMP)
+
+ctrl <- trainControl(method="LOOCV")
+model_array_LOO_all <- train(YPMP ~ cg21524116, data = ram_array_ear_data, method = "lm", trControl = ctrl)
+
+print(model_array_LOO_all)
+
+predicted_YPMP <- predict(model_array_LOO_all, newdata = sheep_array_cg21524116_ear)
+median(abs(predicted_YPMP - sheep_array_cg21524116_ear$YPMP))
+# 0.263
+
+cor(sheep_array_cg21524116_ear$YPMP, sheep_array_cg21524116_ear$Model_AndroAge, method="pearson")
+# 0.890
+```
+
+```{r}
+sheep_array_cg21524116_ear$Model_AndroAge <- predict(model_array1, newdata = sheep_array_cg21524116_ear)
+
+sheeparray_paper <- ggplot(sheep_array_cg21524116_ear, aes(x=YPMP, y=Model_AndroAge, colour=Sex, fill=Sex)) +
+  geom_point(size=4, alpha=3/4) + 
+  geom_smooth(method="lm", se=F) +
+  scale_colour_manual(values = c("#DD3C51", "#313657", "#6C90B9"), name= "Sex", labels = c("Female", "Castrated male", "Intact male")) +
+  geom_abline(linetype="dashed") +
+  theme_light() +
+  ylab("Model AndroAge (Years)") +
+  xlab("Years Post Male Puberty (YPMP)") +
+  theme(legend.position = "bottom") +
+  labs(title = "Array-based androgen clock fit, sheep",
+              subtitle = "MAE=0.263, cor=0.890") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+    guides(fill = FALSE)
+
+sheeparray_paper
+
+ggsave("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/sheep_array_fit.png",sheeparray_paper, width=6, height = 6, dpi=1000)
+
+```
+
+
+
+
+# Plot AndroAge acceleration
+
+```{r}
+ram_array_ear_data$Model_AndroAge <- predict(model_array1, newdata = ram_array_ear_data)
+
+combined_array <- rbind(ram_array_ear_data, wether_array_ear_data, ewe_array_ear_data)
+
+combined_array$AndroAgeAccel <- combined_array$Model_AndroAge-combined_array$YPMP
+
+write.csv(combined_array, "/Users/victoriasugrue/Dropbox (Otago University)/combined_array.csv")
+d2combined_array <- read.csv("/Users/victoriasugrue/Dropbox (Otago University)/d2_combined_array.csv")
+
+SheepAndroAgeAccel_Array <- ggplot(d2combined_array, aes(x=Group, y=mean)) + 
+  geom_bar(stat = "identity", fill="lightgrey", colour="black") + 
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=0.5) + 
+  geom_jitter(combined_array, mapping = aes(x=Sex, y=AndroAgeAccel, colour=Sex), size=4, alpha=1/2, width=0.05) +
+  ylab("AndroAge Acceleration (Years)") + theme_classic() + geom_hline(yintercept=0) + 
+  theme_light() +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2,4)]) +
+  theme(legend.position="none") 
+SheepAndroAgeAccel_Array
+```

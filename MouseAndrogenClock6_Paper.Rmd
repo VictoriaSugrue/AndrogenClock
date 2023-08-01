@@ -1,0 +1,419 @@
+---
+title: "Mouse Androgen Clock Construction"
+author: "Victoria Sugrue"
+date: 'Last updated: 28 July 2023'
+output:
+  word_document:
+    toc: no
+    toc_depth: '6'
+  html_document:
+    toc: no
+    toc_float: no
+    toc_depth: 6
+  pdf_document:
+    toc: no
+    toc_depth: 5
+    df_print: kable
+    latex_engine: xelatex
+subtitle: ' '
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load required packages
+```{r}
+library(ggplot2)
+library(caret)
+library(dplyr)
+library(Manu)
+library(knitr)
+library(lmtest)
+library(ggfortify)
+```
+
+# Data preparation
+```{r}
+mouse_data <- read.csv("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Data/Mouse_ArrayData.csv")
+mouse_data <- mouse_data %>% filter(Tissue=="Muscle" | Tissue=="Tail")
+
+# Setting AndroAge with predicted time of puberty onset = age minus 6 weeks, adjust to 0 where negative
+mouse_data$YPMP <- mouse_data$Age-0.115068
+mouse_data$YPMP[mouse_data$Sex=="F"] <- 0
+mouse_data$YPMP[mouse_data$YPMP < 0] <- 0
+
+# Change sex labels
+mouse_data$Sex[mouse_data$Sex=="F"] <- "Female"
+mouse_data$Sex[mouse_data$Sex=="M"] <- "Male"
+
+# Subset by tissue
+mouse_muscle <- mouse_data %>% filter(Tissue=="Muscle")
+mouse_tail <- mouse_data %>% filter(Tissue=="Tail")
+```
+
+
+# A birds-eye view of the data 
+
+```{r}
+# Age distribution
+age_dist <- ggplot(mouse_data, aes(x = Age)) +
+  geom_histogram(aes(fill = Tissue), position = "dodge", alpha = 1, bins = 15) +
+  scale_fill_manual(values = get_pal("Takahe")) +
+  theme_light() +
+  facet_grid(~Sex) +
+  labs(title = "Distribution of age by sex (Mouse, array)", fill = "Sex", x="Age (Years)") +
+  ylab("Frequency")
+age_dist
+```
+
+```{r}
+#or, by tissue
+age_dist_tis <- ggplot(mouse_data, aes(x = Age)) +
+  geom_histogram(aes(fill = Sex), position = "dodge", alpha = 1, bins = 15) +
+  scale_fill_manual(values = get_pal("Takahe")[c(1,2,4)]) +
+  theme_light() +
+  facet_wrap(~Tissue, ncol=3, scales="free") +
+  labs(title = "Distribution of age by sex (Mouse, array)", fill = "Sex", x="Age (Years)") +
+  ylab("Frequency")
+age_dist_tis
+```
+
+# Plotting methylation data
+
+```{r}
+MKLN1_mice <- ggplot(mouse_data, aes(x=Age, y=cg21524116*100, colour=Sex)) +
+  geom_jitter(width=0.05, size=2.5, alpha=2/3) +
+  geom_smooth(method="lm") +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2,4)]) +
+  theme_light() +
+  facet_wrap(~Tissue, ncol=3, scales="free") +
+  labs(colour="Sex", y="Methylation (%)", x="Age (Years)")
+MKLN1_mice
+```
+
+Testing both tissues
+
+##### Tail #####
+
+# Fit androgen clock to mouse tail
+```{r}
+male_tail <- mouse_tail %>% filter(Sex=="Male")
+
+tail_model <- lm(YPMP ~ cg21524116, data=male_tail) 
+summary(tail_model)
+```
+
+# Diagnostic plots
+
+```{r}
+autoplot(tail_model, which=c(1,2,3,5), size=3, alpha=4/5, colour="#313657", smooth.colour="#DD3C51", smooth.linetype="dashed", label.size = 3) + theme_light() + theme(plot.title = element_text(color = "white"))
+```
+
+```{r}
+fitted_tail <- as.data.frame(tail_model$fitted.values)
+fitted_tail["YPMP"] <- male_tail$YPMP
+fitted_tail$YPMP <- as.numeric(fitted_tail$YPMP)
+fitted_tail$Fit_YPMP <- as.numeric(fitted_tail$`tail_model$fitted.values`)
+```
+
+# Calculating error
+## All
+
+```{r}
+MAE_tail_model <- as.data.frame(Metrics::mdae(actual=fitted_tail$YPMP, predicted=fitted_tail$`tail_model$fitted.values`))
+MAE_tail_model # 0.208
+```
+
+```{r}
+cor(fitted_tail$YPMP, fitted_tail$Fit_YPMP, method="pearson")
+
+tail_modelfit <- ggplot(fitted_tail, aes(x=YPMP, y=Fit_YPMP)) +
+  geom_point(size=4, alpha=3/4, colour="#313657") + 
+  geom_smooth(method="lm", se=F, colour="#DD3C51") +
+  geom_abline(linetype="dashed") +
+  theme_light() +
+  ylab("Model AndroAge (Years)") +
+  xlab("Years Post Male Puberty (YPMP)") +
+    labs(title = "Tail",
+              subtitle = "MAE=0.208, cor=0.811") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5))
+tail_modelfit
+```
+
+# Breusch-Pagan test of variance (homo/heteroscedasticity)
+
+```{r}
+plot(tail_model$residuals)
+bptest(tail_model)
+```
+
+# p value >0.05 suggests that we have homoscedasticity. good! 
+
+# Shapiro-Wilk test of normality
+
+```{r}
+shapiro.test(tail_model$residuals)
+```
+
+# p value <0.05 suggests data is normally distributed.  good! (just)
+
+# Leave-one-out cross validation
+
+```{r}
+male_tail$cg21524116 <- as.numeric(male_tail$cg21524116)
+male_tail$YPMP <- as.numeric(male_tail$YPMP)
+ctrl <- trainControl(method="LOOCV")
+tail_modelLOO <- train(YPMP ~ cg21524116, data=male_tail, method="lm", trControl=ctrl)
+summary(tail_modelLOO)
+```
+
+```{r}
+print(tail_modelLOO)
+```
+
+```{r}
+fittedLOO <- as.data.frame(tail_modelLOO$pred)
+fittedLOO["YPMP"] <- male_tail$YPMP
+
+tail_modelLOO_MAE <- as.data.frame(Metrics::mdae(actual=fittedLOO$YPMP, predicted=fittedLOO$pred))
+tail_modelLOO_MAE # 0.237
+```
+
+
+# Now, to include females.
+# First, apply the formula of the male androgen clock to this group. What happens? 
+
+```{r}
+female_tail <- mouse_tail %>% filter(Sex=="Female")
+female_tail$Model_AndroAge <- predict(tail_model, newdata = female_tail)
+
+female_MAE_tail_model <- as.data.frame(Metrics::mdae(actual=female_tail$YPMP, predicted=female_tail$Model_AndroAge))
+female_MAE_tail_model
+# Female MAE = 0.103
+```
+
+# LOOCV across both sexes
+
+
+```{r}
+mouse_tail$cg21524116 <- as.numeric(mouse_tail$cg21524116)
+mouse_tail$YPMP <- as.numeric(mouse_tail$YPMP)
+
+predicted_YPMP_mouse_tail_6 <- predict(tail_modelLOO, newdata = mouse_tail)
+median(abs(predicted_YPMP_mouse_tail_6 - mouse_tail$YPMP))
+# 0.120
+```
+
+
+
+
+
+
+# Fit androgen clock to mouse muscle
+```{r}
+male_muscle <- mouse_muscle %>% filter(Sex=="Male")
+
+muscle_model <- lm(YPMP ~ cg21524116, data=male_muscle) 
+summary(muscle_model)
+```
+
+# Diagnostic plots
+
+```{r}
+autoplot(muscle_model, which=c(1,2,3,5), size=3, alpha=4/5, colour="#313657", smooth.colour="#DD3C51", smooth.linetype="dashed", label.size = 3) + theme_light() + theme(plot.title = element_text(color = "white"))
+```
+
+```{r}
+fitted_muscle <- as.data.frame(muscle_model$fitted.values)
+fitted_muscle["YPMP"] <- male_muscle$YPMP
+fitted_muscle$YPMP <- as.numeric(fitted_muscle$YPMP)
+fitted_muscle$Fit_YPMP <- as.numeric(fitted_muscle$`muscle_model$fitted.values`)
+```
+
+# Calculating error
+## All
+
+```{r}
+MAE_muscle_model <- as.data.frame(Metrics::mdae(actual=fitted_muscle$YPMP, predicted=fitted_muscle$`muscle_model$fitted.values`))
+MAE_muscle_model # 0.457
+```
+
+```{r}
+cor(fitted_muscle$YPMP, fitted_muscle$Fit_YPMP, method="pearson") #0.491
+
+
+muscle_modelfit <- ggplot(fitted_muscle, aes(x=YPMP, y=Fit_YPMP)) +
+  geom_point(size=4, alpha=3/4, colour="#313657") + 
+  geom_smooth(method="lm", se=F, colour="#DD3C51") +
+  geom_abline(linetype="dashed") +
+  theme_light() +
+  ylab("Model AndroAge (Years)") +
+  xlab("Years Post Male Puberty (YPMP)") +
+    labs(title = "Muscle",
+              subtitle = "MAE=0.457, cor=0.491") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5))
+muscle_modelfit
+
+ggsave("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Figures/muscle_modelfit.png",muscle_modelfit, width= 5, height = 5, dpi=1000)
+
+```
+
+
+# Breusch-Pagan test of variance (homo/heteroscedasticity)
+
+```{r}
+plot(muscle_model$residuals)
+bptest(muscle_model)
+```
+
+# p value >0.05 suggests that we have homoscedasticity. good! 
+
+# Shapiro-Wilk test of normality
+
+```{r}
+shapiro.test(muscle_model$residuals)
+```
+
+# p value <0.05 suggests data isn't normally distributed. not good!
+
+# Leave-one-out cross validation
+
+```{r}
+male_muscle$cg21524116 <- as.numeric(male_muscle$cg21524116)
+male_muscle$YPMP <- as.numeric(male_muscle$YPMP)
+ctrl <- trainControl(method="LOOCV")
+muscle_modelLOO <- train(YPMP ~ cg21524116, data=male_muscle, method="lm", trControl=ctrl)
+summary(muscle_modelLOO)
+```
+
+```{r}
+print(muscle_modelLOO)
+```
+
+```{r}
+fittedLOO <- as.data.frame(muscle_modelLOO$pred)
+fittedLOO["YPMP"] <- male_muscle$YPMP
+
+muscle_modelLOO_MAE <- as.data.frame(Metrics::mdae(actual=fittedLOO$YPMP, predicted=fittedLOO$pred))
+muscle_modelLOO_MAE # 0.530
+```
+
+
+# Now, to include females.
+# First, apply the formula of the male androgen clock to this group. What happens? 
+
+```{r}
+female_muscle <- mouse_muscle %>% filter(Sex=="Female")
+female_muscle$Model_AndroAge <- predict(muscle_model, newdata = female_muscle)
+
+female_MAE_muscle_model <- as.data.frame(Metrics::mdae(actual=female_muscle$YPMP, predicted=female_muscle$Model_AndroAge))
+female_MAE_muscle_model
+# Female MAE = 0.256
+```
+
+# LOOCV across both sexes
+
+```{r}
+mouse_muscle$cg21524116 <- as.numeric(mouse_muscle$cg21524116)
+mouse_muscle$YPMP <- as.numeric(mouse_muscle$YPMP)
+
+predicted_YPMP_mouse_muscle_8 <- predict(muscle_modelLOO, newdata = mouse_muscle)
+median(abs(predicted_YPMP_mouse_muscle_8 - mouse_muscle$YPMP))
+#0.343
+```
+
+
+
+
+
+
+
+
+# Selected clock: Tail
+
+```{r}
+mouse_tail$Model_AndroAge <- predict(tail_model, newdata = mouse_tail)
+
+MAE_tail_model_all <- as.data.frame(Metrics::mdae(actual=mouse_tail$YPMP, predicted=mouse_tail$Model_AndroAge))
+MAE_tail_model_all
+#0.120
+```
+
+
+```{r}
+mouse_tail$LOO_AndroAge <- predicted_YPMP_mouse_tail_6
+```
+
+
+```{r}
+cor(mouse_tail$YPMP, mouse_tail$LOO_AndroAge, method="pearson") #0.861
+
+obs_exp_mousetail_model <- ggplot(mouse_tail, aes(x=YPMP, y=LOO_AndroAge, colour=Sex)) +
+ geom_point(size=4, alpha=3/4) + 
+  geom_smooth(method="lm", se=F, colour="#1F6683") +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2)]) +
+  theme_light() +
+  geom_abline(linetype="dashed") +
+  ylab("Model AndroAge (Years)") +
+  xlab("Years Post Male Puberty (YPMP)") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+  theme(legend.position = "bottom") +
+  guides(colour = guide_legend(title.position = "top", title.hjust=0.5))
+
+obs_exp_mousetail_model
+
+ggsave("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Figures/Obs_Exp_AndroAge_mousetail_model2_6weeks.png",obs_exp_mousetail_model, width= 3.7, height = 4.2, dpi=1000)
+```
+
+
+```{r}
+write.csv(mouse_tail, "/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Data/mouse_data_modelled_tail_model_6weeks.csv")
+```
+
+
+
+# Applying the model to the DHT mouse data
+```{r}
+DHTdata <- read.csv("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Data/DHTmice.csv")
+DHTdata$cg21524116 <- DHTdata$Methylation/100
+
+DHTtail <- DHTdata %>% filter(Tissue=="Tail")
+
+DHTtail$Model_AndroAge <- predict(tail_model, newdata = DHTtail)
+
+MAE_DHTtail_all <- as.data.frame(Metrics::mdae(actual=0, predicted=DHTtail$Model_AndroAge))
+MAE_DHTtail_all
+# 0.755
+```
+## controls only
+```{r}
+DHTtail_control <- DHTtail %>% filter(Treatment=="Blank")
+
+DHTtail_control$Model_AndroAge <- predict(tail_model, newdata = DHTtail_control)
+
+MAE_DHTtail_control <- as.data.frame(Metrics::mdae(actual=0, predicted=DHTtail_control$Model_AndroAge))
+MAE_DHTtail_control
+# 0.576
+```
+
+## DHT only
+```{r}
+DHTtail_DHT <- DHTtail %>% filter(Treatment=="DHT")
+
+DHTtail_DHT$Model_AndroAge <- predict(tail_model, newdata = DHTtail_DHT)
+
+MAE_DHTtail_DHT <- as.data.frame(Metrics::mdae(actual=0, predicted=DHTtail_DHT$Model_AndroAge))
+MAE_DHTtail_DHT
+# 2.259
+```
+
+
+
+
+
+
+

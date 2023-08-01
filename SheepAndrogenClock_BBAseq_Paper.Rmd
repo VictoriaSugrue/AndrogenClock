@@ -1,0 +1,312 @@
+---
+title: "Sheep Androgen Clock Construction - BBA-seq approach, 5% error"
+author: "Victoria Sugrue"
+date: 'Last updated: 5 July 2023'
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 5
+    df_print: kable
+    latex_engine: xelatex
+  html_document:
+    toc: yes
+    toc_float: yes
+    toc_depth: 6
+  word_document:
+    toc: yes
+    toc_depth: '6'
+subtitle: ' '
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Load required packages
+```{r}
+library(ggplot2)
+library(caret)
+library(dplyr)
+library(Manu)
+library(knitr)
+library(lmtest)
+library(ggfortify)
+```
+
+
+### Data preparation
+```{r}
+sheep_data <- read.csv("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Data/SheepSampleSheet.csv")
+
+# Setting AndroAge with predicted time of puberty onset = age minus 0.5 years 
+# (i.e estimate to reach puberty at 6 months)
+sheep_data$YPMP <- sheep_data$Age-0.5
+sheep_data$YPMP[sheep_data$Castration_Sex=="Wether"] <- 0
+sheep_data$YPMP[sheep_data$Castration_Sex=="Ewe"] <- 0
+
+# Creating a new column for methylation in the form of a beta value
+sheep_data$Beta <- sheep_data$CG_Methylation/100
+
+# Subset by sex/castration status
+ram_data <- sheep_data %>% filter(Castration_Sex=="Ram")
+wether_data <- sheep_data %>% filter(Castration_Sex=="Wether")
+ewe_data <- sheep_data %>% filter(Castration_Sex=="Ewe")
+
+```
+
+### A birds-eye view of the data 
+
+```{r}
+# Subset based on error allowance
+sheep_data_5 <- sheep_data %>% filter(CG_Calls>=497)
+
+# Age distribution with +/- 5% error in 75% methylated samples
+age_dist_5 <- ggplot(sheep_data_5, aes(x = Age)) +
+  geom_histogram(aes(fill = Castration_Sex), position = "dodge", alpha = 1, 
+                 bins = 20) +
+  scale_fill_manual(values = get_pal("Takahe")[c(1,2,4)]) +
+  theme_light() +
+  labs(title = "Distribution of age by sex (Sheep ear), >497 CG calls 
+       (±5% error at 75% methyated)", fill = "Sex", x="Age (Years)") +
+  ylab("Frequency")
+age_dist_5
+```
+
+### Plotting methylation data
+
+```{r}
+# +/- 5% error in 75% methylated samples
+MKLN1_sheep_5 <- ggplot(sheep_data_5, aes(x=Age, y=CG_Methylation, 
+                                          colour=Castration_Sex)) +
+  geom_jitter(width=0.1, size=4, alpha=2/3) +
+  geom_smooth(method="lm") +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2,4)]) +
+  theme_light() +
+  labs(title = "Methylation at cg21524116, >497 CG calls 
+       (±5% error at 75% methyated)", colour="Sex", y="Methylation (%)", 
+       x="Age (Years)")
+MKLN1_sheep_5
+```
+
+# Fitting the Androgen Clock to rams
+
+```{r}
+ram_data_5 <- ram_data %>% filter(CG_Calls>=497)
+```
+
+
+```{r}
+# Run model, 5% error
+model_5p <- lm(YPMP ~ Beta, data=ram_data_5)
+summary(model_5p)
+```
+
+### Diagnostic plots
+
+```{r}
+autoplot(model_5p, which=c(1,2,3,5), size=3, alpha=4/5, colour="#313657", 
+         smooth.colour="#DD3C51", smooth.linetype="dashed", label.size = 3) + 
+  theme_light() + theme(plot.title = element_text(color = "white"))
+```
+
+```{r}
+fitted_5 <- as.data.frame(model_5p$fitted.values)
+fitted_5["YPMP"] <- ram_data_5$YPMP
+fitted_5$YPMP <- as.numeric(fitted_5$YPMP)
+fitted_5$Fit_AndroAge <- as.numeric(fitted_5$`model_5p$fitted.values`)
+fitted_5$Age <- ram_data_5$Age
+```
+
+# Calculating error
+### All
+
+```{r}
+MAE_model_5p <- as.data.frame(Metrics::mdae(actual=fitted_5$YPMP, 
+                        predicted=fitted_5$`model_5p$fitted.values`))
+MAE_model_5p # 0.502
+```
+
+### Correlation 
+
+```{r}
+cor(fitted_5$YPMP, fitted_5$Fit_AndroAge, method="pearson")
+```
+
+### Testing the model fit further: 
+
+#### Breusch-Pagan test of variance (homo/heteroscedasticity)
+
+```{r}
+bptest(model_5p)
+#0.06
+# p value >0.05 suggests that we have homoscedasticity. good! 
+
+```
+
+#### Shapiro-Wilk test of normality
+
+```{r}
+shapiro.test(model_5p$residuals)
+# 0.90
+# p value >0.05 suggests data is normally distributed. good!
+```
+
+# Leave-one-out cross validation
+
+```{r}
+ram_data_5$Beta <- as.numeric(ram_data_5$Beta)
+ram_data_5$YPMP <- as.numeric(ram_data_5$YPMP)
+ctrl <- trainControl(method="LOOCV")
+model_5p_LOO <- train(YPMP ~ Beta, data=ram_data_5, method="lm", trControl=ctrl)
+print(model_5p_LOO)
+```
+
+```{r}
+fittedLOO_5 <- as.data.frame(model_5p_LOO$pred)
+fittedLOO_5["YPMP"] <- ram_data_5$YPMP
+
+LOORamAndroClockMAE_5 <- as.data.frame(Metrics::mdae(actual=fittedLOO_5$YPMP, 
+                                              predicted=fittedLOO_5$pred))
+LOORamAndroClockMAE_5 # 0.509
+
+cor(fittedLOO_5$obs, fittedLOO_5$pred, method="pearson") #0.909
+```
+
+```{r}
+ramfit5_LOO <- ggplot(fittedLOO_5, aes(x=obs, y=pred)) +
+  geom_point(size=4, alpha=3/4, colour="#313657") + 
+  geom_smooth(method="lm", se=F, colour="#DD3C51") +
+  geom_abline(linetype="dashed") +
+  theme_light() +
+  ylab("Model AndroAge (Years)") +
+  xlab("Years Post Male Puberty (YPMP)") +
+  labs(title = "Ram androgen clock fit (model_5p)",
+              subtitle = "MAE=0.509, cor=0.909") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5))
+ramfit5_LOO
+```
+
+# Now, to include ewes and wethers.
+
+```{r}
+ewe_data_5 <- ewe_data %>% filter(CG_Calls>=497)
+ewe_data_5$Model_AndroAge <- predict(model_5p, newdata = ewe_data_5)
+
+ewe_MAE_model_5p <- as.data.frame(Metrics::mdae(actual=ewe_data_5$YPMP, 
+                                      predicted=ewe_data_5$Model_AndroAge))
+ewe_MAE_model_5p
+# Ewe MAE = 0.360 years
+
+mean(ewe_data_5$Model_AndroAge)
+# -0.2258448 years, -2.7101376 months
+```
+
+```{r}
+wether_data_5 <- wether_data %>% filter(CG_Calls>=497)
+wether_data_5$Model_AndroAge <- predict(model_5p, newdata = wether_data_5)
+
+wether_MAE_model_5p <- as.data.frame(Metrics::mdae(actual=wether_data_5$YPMP, 
+                                    predicted=wether_data_5$Model_AndroAge))
+wether_MAE_model_5p
+# Wether MAE = 0.281 years
+
+mean(wether_data_5$Model_AndroAge)
+# 0.003113093 years, 0.037357116 months
+```
+
+```{r}
+ewewether_5 <- rbind(ewe_data_5, wether_data_5)
+
+ewewether_5_violin <- ggplot(ewewether_5, aes(x=Castration_Sex, 
+                                y=Model_AndroAge, fill=Castration_Sex)) +
+  geom_violin() + 
+  geom_point(size=4, alpha=3/4, shape=1) +
+  theme_light() +
+  geom_hline(yintercept = 0, linetype="dashed") +
+  ylab("Model AndroAge (Years)") +
+  xlab("Sex") +
+  scale_fill_manual(values = get_pal("Takahe")[c(1,4)]) +
+  theme(legend.position = "none") +
+   labs(title = "Ewe and wether androgen clock fit (model_5p), 
+        trained on all rams", subtitle = "Ewe MAE=0.360, Wether MAE=0.281") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5))
+  
+ewewether_5_violin
+```
+
+# LOOCV across whole dataset
+```{r}
+sheep_data_5$Beta <- as.numeric(sheep_data_5$Beta)
+sheep_data_5$YPMP <- as.numeric(sheep_data_5$YPMP)
+ram_data_5$Beta <- as.numeric(ram_data_5$Beta)
+ram_data_5$YPMP <- as.numeric(ram_data_5$YPMP)
+
+ctrl <- trainControl(method="LOOCV")
+model_5p_LOO_all <- train(YPMP ~ Beta, data = ram_data_5, method = "lm", trControl = ctrl)
+
+print(model_5p_LOO_all)
+
+predicted_YPMP <- predict(model_5p_LOO_all, newdata = sheep_data_5)
+median(abs(predicted_YPMP - sheep_data_5$YPMP))
+# 0.362
+```
+
+# Plot
+
+```{r}
+compare_df <- read.csv("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Data/DataBoth_Array_Amplicon.csv")
+
+plotall_scat_paper <- ggplot(compare_df, aes(x=AgeAccelbasedOnAll, y=residuals, colour=Castration_Sex)) +
+  geom_point(size=4, alpha=3/4) + 
+  scale_colour_manual(values = c("#DD3C51", "#313657", "#6C90B9"), name= "Sex", labels = c("Female", "Intact male", "Castrated male")) +
+  geom_smooth(method="lm", se=F, colour="Black") +
+  geom_abline(linetype="dashed") +
+  theme_light() +
+  labs(colour="Sex", y="AndroAge acceleration (Years)", x="DNAmAge acceleration (Years)") +
+    theme(legend.position = "none") #+
+  #  guides(colour = guide_legend(title.position = "top", title.hjust=0.5))
+
+plotall_scat_paper
+```
+
+```{r}
+sheep_data_5$Model_AndroAge <- predict(model_5p, newdata = sheep_data_5)
+cor(sheep_data_5$YPMP, sheep_data_5$Model_AndroAge, method="pearson")
+
+sheep5_paper <- ggplot(sheep_data_5, aes(x=YPMP, y=Model_AndroAge, colour=Castration_Sex, fill=Castration_Sex)) +
+  geom_point(size=4, alpha=3/4) + 
+  geom_smooth(method="lm", se=F) +
+  scale_colour_manual(values = c("#DD3C51", "#313657", "#6C90B9"), name= "Sex", labels = c("Female", "Intact male", "Castrated male")) +
+  geom_abline(linetype="dashed") +
+  theme_light() +
+  ylab("Model AndroAge (Years)") +
+  xlab("Years Post Male Puberty (YPMP)") +
+    theme(legend.position = "none") #+
+ # theme(plot.title = element_text(hjust = 0.5)) +
+#  theme(plot.subtitle = element_text(hjust = 0.5)) +
+#              guides(colour = guide_legend(title.position = "top", title.hjust=0.5)) +
+#    guides(fill = FALSE)
+
+sheep5_paper
+```
+
+```{r}
+legend_b <- cowplot::get_legend(
+  plotall_scat_paper + 
+    guides(color = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom") +
+            guides(colour = guide_legend(title.position = "top", title.hjust=0.5))
+)
+
+figure2b <- cowplot::plot_grid(sheep5_paper, plotall_scat_paper, labels=c("A", "B"), nrow=1)
+figure2b
+
+figure2 <- cowplot::plot_grid(figure2b, legend_b, nrow=2, rel_heights = c(1, 0.15))
+figure2
+
+ggsave("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Figures/Fig2_BuildingSheepClock.png",figure2, width=9, height = 4.5, dpi=1000)
+
+```
+
+

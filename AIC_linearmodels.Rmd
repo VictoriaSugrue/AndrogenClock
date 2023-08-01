@@ -1,0 +1,362 @@
+---
+title: "AIC of linear models"
+author: "Victoria Sugrue"
+date: 'Last updated: 6 July 2023'
+output:
+  word_document:
+    toc: yes
+    toc_depth: '6'
+  html_document:
+    toc: yes
+    toc_float: yes
+    toc_depth: 6
+  pdf_document:
+    toc: yes
+    toc_depth: 5
+    df_print: kable
+    latex_engine: xelatex
+subtitle: ' '
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load required packages
+```{r}
+library(AICcmodavg)
+library(dplyr)
+```
+
+# Load dataset of array methylation call of the top 20 most significant asDMPs for sheep
+
+```{r}
+sheep_data <- read.csv("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Data/Array_Top20_asDMP_Ear.csv")
+sheep_data$YPMP <- sheep_data$Age-0.5
+sheep_data$YPMP[sheep_data$Sex=="Wether"] <- 0
+sheep_data$YPMP[sheep_data$Sex=="Ewe"] <- 0
+
+ram_data <- sheep_data %>% filter(Sex=="Ram")
+```
+
+
+# Run linear models including the top 20 most significant asDMPs, adding one each time
+
+```{r}
+# Top 1 only (MKLN1 only)
+lm_top1 <- lm(YPMP ~ cg21524116, data=ram_data)
+summary(lm_top1)
+
+# Top 2
+lm_top2 <- lm(YPMP ~ cg21524116 + cg01822430, data=ram_data)
+summary(lm_top2)
+
+# Top 3
+lm_top3 <- lm(YPMP ~ cg21524116 + cg01822430 + cg05771328, data=ram_data)
+summary(lm_top3)
+
+# Top 4
+lm_top4 <- lm(YPMP ~ cg21524116 + cg01822430 + cg05771328 + cg15851301, data=ram_data)
+summary(lm_top4)
+
+# Top 5
+lm_top5 <- lm(YPMP ~ cg21524116 + cg01822430 + cg05771328 + cg15851301 + cg00658920, data=ram_data)
+summary(lm_top5)
+
+# Top 6
+lm_top6 <- lm(YPMP ~ cg21524116 + cg01822430 + cg05771328 + cg15851301 + cg00658920 + cg17489709, data=ram_data)
+summary(lm_top6)
+
+# Top 7
+lm_top7 <- lm(YPMP ~ cg21524116 + cg01822430 + cg05771328 + cg15851301 + cg00658920 + cg17489709 + cg04968468, data=ram_data)
+summary(lm_top7)
+
+# Top 8
+lm_top8 <- lm(YPMP ~ cg21524116 + cg01822430 + cg05771328 + cg15851301 + cg00658920 + cg17489709 + cg04968468 + 
+             cg12129962, data=ram_data)
+summary(lm_top8)
+
+# Top 9
+lm_top9 <- lm(YPMP ~ cg21524116 + cg01822430 + cg05771328 + cg15851301 + cg00658920 + cg17489709 + cg04968468 + 
+             cg12129962 + cg11082332, data=ram_data)
+summary(lm_top9)
+
+# Top 10
+lm_top10 <- lm(YPMP ~ cg21524116 + cg01822430 + cg05771328 + cg15851301 + cg00658920 + cg17489709 + cg04968468 + 
+             cg12129962 + cg11082332 + cg03197661, data=ram_data)
+summary(lm_top10)
+
+# Top 11
+lm_top11 <- lm(YPMP ~ cg21524116 + cg01822430 + cg05771328 + cg15851301 + cg00658920 + cg17489709 + cg04968468 + 
+             cg12129962 + cg11082332 + cg03197661 + cg12863556, data=ram_data)
+summary(lm_top11)
+
+# Top 12
+lm_top12 <- lm(YPMP ~ cg21524116 + cg01822430 + cg05771328 + cg15851301 + cg00658920 + cg17489709 + cg04968468 + 
+             cg12129962 + cg11082332 + cg03197661 + cg12863556 + cg03121178, data=ram_data)
+summary(lm_top12)
+
+# Top 13
+lm_top13 <- lm(YPMP ~ cg21524116 + cg01822430 + cg05771328 + cg15851301 + cg00658920 + cg17489709 + cg04968468 + 
+             cg12129962 + cg11082332 + cg03197661 + cg12863556 + cg03121178 + cg18315252, data=ram_data)
+summary(lm_top13)
+
+# Top 14
+lm_top14 <- lm(YPMP ~ cg21524116 + cg01822430 + cg05771328 + cg15851301 + cg00658920 + cg17489709 + cg04968468 + 
+             cg12129962 + cg11082332 + cg03197661 + cg12863556 + cg03121178 + cg18315252 + cg09315446, data=ram_data)
+summary(lm_top14)
+
+# Top 15
+lm_top15 <- lm(YPMP ~ cg21524116 + cg01822430 + cg05771328 + cg15851301 + cg00658920 + cg17489709 + cg04968468 + 
+             cg12129962 + cg11082332 + cg03197661 + cg12863556 + cg03121178 + cg18315252 + cg09315446 + cg07324453, data=ram_data)
+summary(lm_top15)
+
+# Top 16
+lm_top16 <- lm(YPMP ~ cg21524116 + cg01822430 + cg05771328 + cg15851301 + cg00658920 + cg17489709 + cg04968468 + 
+             cg12129962 + cg11082332 + cg03197661 + cg12863556 + cg03121178 + cg18315252 + cg09315446 + cg07324453 +
+             cg06579027, data=ram_data)
+summary(lm_top16)
+
+# Top 17
+lm_top17 <- lm(YPMP ~ cg21524116 + cg01822430 + cg05771328 + cg15851301 + cg00658920 + cg17489709 + cg04968468 + 
+             cg12129962 + cg11082332 + cg03197661 + cg12863556 + cg03121178 + cg18315252 + cg09315446 + cg07324453 +
+             cg06579027 + cg06145973, data=ram_data)
+summary(lm_top17)
+
+# Top 18
+lm_top18 <- lm(YPMP ~ cg21524116 + cg01822430 + cg05771328 + cg15851301 + cg00658920 + cg17489709 + cg04968468 + 
+             cg12129962 + cg11082332 + cg03197661 + cg12863556 + cg03121178 + cg18315252 + cg09315446 + cg07324453 +
+             cg06579027 + cg06145973 + cg14592546, data=ram_data)
+summary(lm_top18)
+
+# Top 19
+lm_top19 <- lm(YPMP ~ cg21524116 + cg01822430 + cg05771328 + cg15851301 + cg00658920 + cg17489709 + cg04968468 + 
+             cg12129962 + cg11082332 + cg03197661 + cg12863556 + cg03121178 + cg18315252 + cg09315446 + cg07324453 +
+             cg06579027 + cg06145973 + cg14592546 + cg11035838, data=ram_data)
+summary(lm_top19)
+
+# Top 20
+lm_top20 <- lm(YPMP ~ cg21524116 + cg01822430 + cg05771328 + cg15851301 + cg00658920 + cg17489709 + cg04968468 + 
+             cg12129962 + cg11082332 + cg03197661 + cg12863556 + cg03121178 + cg18315252 + cg09315446 + cg07324453 +
+             cg06579027 + cg06145973 + cg14592546 + cg11035838 + cg20017216, data=ram_data)
+summary(lm_top20)
+```
+
+# Run AIC
+
+```{r}
+models <- list(lm_top1, lm_top2, lm_top3, lm_top4, lm_top5, lm_top6, lm_top7, lm_top8, lm_top9, lm_top10, lm_top11, lm_top12, lm_top13, lm_top14, lm_top15, lm_top16, lm_top17, lm_top18, lm_top19, lm_top20)
+model.names <- c("lm_top1", "lm_top2", "lm_top3", "lm_top4", "lm_top5", "lm_top6", "lm_top7", "lm_top8", "lm_top9", "lm_top10", "lm_top11", "lm_top12", "lm_top13", "lm_top14", "lm_top15", "lm_top16", "lm_top17", "lm_top18", "lm_top19", "lm_top20")
+
+aictab(cand.set = models, modnames = model.names)
+```
+
+# Correlation with ram YPMP
+```{r}
+actual <- ram_data$YPMP
+
+predict_top1 <- predict(lm_top1)
+cor_top1 <- cor(predict_top1, actual)
+print(cor_top1)
+# 0.947
+
+predict_top2 <- predict(lm_top2)
+cor_top2 <- cor(predict_top2, actual)
+print(cor_top2)
+# 0.948
+
+predict_top3 <- predict(lm_top3)
+cor_top3 <- cor(predict_top3, actual)
+print(cor_top3)
+# 0.950
+
+predict_top4 <- predict(lm_top4)
+cor_top4 <- cor(predict_top4, actual)
+print(cor_top4)
+# 0.950
+
+predict_top5 <- predict(lm_top5)
+cor_top5 <- cor(predict_top5, actual)
+print(cor_top5)
+# 0.952
+
+predict_top6 <- predict(lm_top6)
+cor_top6 <- cor(predict_top6, actual)
+print(cor_top6)
+# 0.953
+
+predict_top7 <- predict(lm_top7)
+cor_top7 <- cor(predict_top7, actual)
+print(cor_top7)
+# 0.953
+
+predict_top8 <- predict(lm_top8)
+cor_top8 <- cor(predict_top8, actual)
+print(cor_top8)
+# 0.953
+
+predict_top9 <- predict(lm_top9)
+cor_top9 <- cor(predict_top9, actual)
+print(cor_top9)
+# 0.957
+
+predict_top10 <- predict(lm_top10)
+cor_top10 <- cor(predict_top10, actual)
+print(cor_top10)
+# 0.957
+
+predict_top11 <- predict(lm_top11)
+cor_top11 <- cor(predict_top11, actual)
+print(cor_top11)
+# 0.961
+
+predict_top12 <- predict(lm_top12)
+cor_top12 <- cor(predict_top12, actual)
+print(cor_top12)
+# 0.966
+
+predict_top13 <- predict(lm_top13)
+cor_top13 <- cor(predict_top13, actual)
+print(cor_top13)
+# 0.969
+
+predict_top14 <- predict(lm_top14)
+cor_top14 <- cor(predict_top14, actual)
+print(cor_top14)
+# 0.969
+
+predict_top15 <- predict(lm_top15)
+cor_top15 <- cor(predict_top15, actual)
+print(cor_top15)
+# 0.975
+
+predict_top16 <- predict(lm_top16)
+cor_top16 <- cor(predict_top16, actual)
+print(cor_top16)
+# 0.975
+
+predict_top17 <- predict(lm_top17)
+cor_top17 <- cor(predict_top17, actual)
+print(cor_top17)
+# 0.977
+
+predict_top18 <- predict(lm_top18)
+cor_top18 <- cor(predict_top18, actual)
+print(cor_top18)
+# 0.979
+
+predict_top19 <- predict(lm_top19)
+cor_top19 <- cor(predict_top19, actual)
+print(cor_top19)
+# 0.980
+
+predict_top20 <- predict(lm_top20)
+cor_top20 <- cor(predict_top20, actual)
+print(cor_top20)
+#0.982
+```
+
+# Calculate MAEs
+```{r}
+sheep_data$Model_AndroAge_lm_top1 <- predict(lm_top1, newdata=sheep_data)
+MAE_lm_top1 <- as.numeric(Metrics::mdae(actual=sheep_data$YPMP, predicted=sheep_data$Model_AndroAge_lm_top1))
+print(MAE_lm_top1)
+# 0.263
+
+sheep_data$Model_AndroAge_lm_top2 <- predict(lm_top2, newdata=sheep_data)
+MAE_lm_top2 <- as.numeric(Metrics::mdae(actual=sheep_data$YPMP, predicted=sheep_data$Model_AndroAge_lm_top2))
+MAE_lm_top2
+# 0.245
+
+sheep_data$Model_AndroAge_lm_top3 <- predict(lm_top3, newdata=sheep_data)
+MAE_lm_top3 <- as.numeric(Metrics::mdae(actual=sheep_data$YPMP, predicted=sheep_data$Model_AndroAge_lm_top3))
+MAE_lm_top3
+# 0.287
+
+sheep_data$Model_AndroAge_lm_top4 <- predict(lm_top4, newdata=sheep_data)
+MAE_lm_top4 <- as.numeric(Metrics::mdae(actual=sheep_data$YPMP, predicted=sheep_data$Model_AndroAge_lm_top4))
+MAE_lm_top4
+# 0.297
+
+sheep_data$Model_AndroAge_lm_top5 <- predict(lm_top5, newdata=sheep_data)
+MAE_lm_top5 <- as.numeric(Metrics::mdae(actual=sheep_data$YPMP, predicted=sheep_data$Model_AndroAge_lm_top5))
+MAE_lm_top5
+# 0.354
+
+sheep_data$Model_AndroAge_lm_top6 <- predict(lm_top6, newdata=sheep_data)
+MAE_lm_top6 <- as.numeric(Metrics::mdae(actual=sheep_data$YPMP, predicted=sheep_data$Model_AndroAge_lm_top6))
+MAE_lm_top6
+# 0.351
+
+sheep_data$Model_AndroAge_lm_top7 <- predict(lm_top7, newdata=sheep_data)
+MAE_lm_top7 <- as.numeric(Metrics::mdae(actual=sheep_data$YPMP, predicted=sheep_data$Model_AndroAge_lm_top7))
+MAE_lm_top7
+# 0.367
+
+sheep_data$Model_AndroAge_lm_top8 <- predict(lm_top8, newdata=sheep_data)
+MAE_lm_top8 <- as.numeric(Metrics::mdae(actual=sheep_data$YPMP, predicted=sheep_data$Model_AndroAge_lm_top8))
+MAE_lm_top8
+# 0.354
+
+sheep_data$Model_AndroAge_lm_top9 <- predict(lm_top9, newdata=sheep_data)
+MAE_lm_top9 <- as.numeric(Metrics::mdae(actual=sheep_data$YPMP, predicted=sheep_data$Model_AndroAge_lm_top9))
+MAE_lm_top9
+# 0.342
+
+sheep_data$Model_AndroAge_lm_top10 <- predict(lm_top10, newdata=sheep_data)
+MAE_lm_top10 <- as.numeric(Metrics::mdae(actual=sheep_data$YPMP, predicted=sheep_data$Model_AndroAge_lm_top10))
+MAE_lm_top10
+# 0.342
+
+sheep_data$Model_AndroAge_lm_top11 <- predict(lm_top11, newdata=sheep_data)
+MAE_lm_top11 <- as.numeric(Metrics::mdae(actual=sheep_data$YPMP, predicted=sheep_data$Model_AndroAge_lm_top11))
+MAE_lm_top11
+# 0.364
+
+sheep_data$Model_AndroAge_lm_top12 <- predict(lm_top12, newdata=sheep_data)
+MAE_lm_top12 <- as.numeric(Metrics::mdae(actual=sheep_data$YPMP, predicted=sheep_data$Model_AndroAge_lm_top12))
+MAE_lm_top12
+# 0.327
+
+sheep_data$Model_AndroAge_lm_top13 <- predict(lm_top13, newdata=sheep_data)
+MAE_lm_top13 <- as.numeric(Metrics::mdae(actual=sheep_data$YPMP, predicted=sheep_data$Model_AndroAge_lm_top13))
+MAE_lm_top13
+# 0.468
+
+sheep_data$Model_AndroAge_lm_top14 <- predict(lm_top14, newdata=sheep_data)
+MAE_lm_top14 <- as.numeric(Metrics::mdae(actual=sheep_data$YPMP, predicted=sheep_data$Model_AndroAge_lm_top14))
+MAE_lm_top14
+# 0.479
+
+sheep_data$Model_AndroAge_lm_top15 <- predict(lm_top15, newdata=sheep_data)
+MAE_lm_top15 <- as.numeric(Metrics::mdae(actual=sheep_data$YPMP, predicted=sheep_data$Model_AndroAge_lm_top15))
+MAE_lm_top15
+# 0.533
+
+sheep_data$Model_AndroAge_lm_top16 <- predict(lm_top16, newdata=sheep_data)
+MAE_lm_top16 <- as.numeric(Metrics::mdae(actual=sheep_data$YPMP, predicted=sheep_data$Model_AndroAge_lm_top16))
+MAE_lm_top16
+# 0.545
+
+sheep_data$Model_AndroAge_lm_top17 <- predict(lm_top17, newdata=sheep_data)
+MAE_lm_top17 <- as.numeric(Metrics::mdae(actual=sheep_data$YPMP, predicted=sheep_data$Model_AndroAge_lm_top17))
+MAE_lm_top17
+# 0.494
+
+sheep_data$Model_AndroAge_lm_top18 <- predict(lm_top18, newdata=sheep_data)
+MAE_lm_top18 <- as.numeric(Metrics::mdae(actual=sheep_data$YPMP, predicted=sheep_data$Model_AndroAge_lm_top18))
+MAE_lm_top18
+# 0.615
+
+sheep_data$Model_AndroAge_lm_top19 <- predict(lm_top19, newdata=sheep_data)
+MAE_lm_top19 <- as.numeric(Metrics::mdae(actual=sheep_data$YPMP, predicted=sheep_data$Model_AndroAge_lm_top19))
+MAE_lm_top19
+# 0.668
+
+sheep_data$Model_AndroAge_lm_top20 <- predict(lm_top20, newdata=sheep_data)
+MAE_lm_top20 <- as.numeric(Metrics::mdae(actual=sheep_data$YPMP, predicted=sheep_data$Model_AndroAge_lm_top20))
+MAE_lm_top20
+# 0.785
+```
+
+
+
