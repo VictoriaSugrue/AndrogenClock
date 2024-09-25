@@ -1,5 +1,5 @@
 **Data** 
-Raw .fastq files for all BBA-seq mouse and sheep samples, measuring methylation at cg21524116 
+Raw .fastq files for all BBA-seq mouse and sheep samples, measuring methylation at cg21524116; 
 Accompanying “SampleInfo.xlsx” file outlining all sample details - age, sex, castration status, treatment, etc. 
 
 **AIC_linearmodels.Rmd**
