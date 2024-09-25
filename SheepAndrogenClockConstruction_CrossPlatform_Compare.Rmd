@@ -1,0 +1,786 @@
+---
+title: "Sheep Androgen Clock Construction - Cross Platform & Amplicon/Array Comparisons"
+author: "Victoria Sugrue"
+date: 'Last updated: 08 July 2024'
+output:
+  word_document:
+    toc: yes
+    toc_depth: '6'
+  html_document:
+    toc: yes
+    toc_float: yes
+    toc_depth: 6
+  pdf_document:
+    toc: yes
+    toc_depth: 5
+    df_print: kable
+    latex_engine: xelatex
+subtitle: ' '
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load required packages
+```{r}
+library(ggplot2)
+library(caret)
+library(dplyr)
+library(Manu)
+library(knitr)
+library(lmtest)
+library(ggfortify)
+library(ggpubr)
+library(tidyr)
+library(cowplot)
+```
+
+# Data preparation, amplicon
+```{r}
+sheep_data_amp <- read.csv("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Data/SheepSampleSheet.csv")
+
+# Setting AndroAge with predicted time of puberty onset = age minus 0.5 years (i.e estimate to reach puberty at 6 months)
+sheep_data_amp$YPMP <- sheep_data_amp$Age-0.5
+sheep_data_amp$YPMP[sheep_data_amp$Castration_Sex=="Wether"] <- 0
+sheep_data_amp$YPMP[sheep_data_amp$Castration_Sex=="Ewe"] <- 0
+
+# Creating a new column for methylation in the form of a beta value
+sheep_data_amp$Beta <- sheep_data_amp$CG_Methylation/100
+
+# Subset based on error allowance
+sheep_data_amp_5 <- sheep_data_amp %>% filter(CG_Calls>=497)
+sheep_data_amp_25 <- sheep_data_amp %>% filter(CG_Calls>=1990)
+```
+
+# Fitting the Androgen Clock to rams
+# Running model, 5% error
+
+```{r}
+ram_data_amp_5 <- sheep_data_amp_5 %>% filter(Castration_Sex=="Ram")
+# Run model, 5% error
+model_5p <- lm(YPMP ~ Beta, data=ram_data_amp_5)
+summary(model_5p)
+```
+
+# Running model, 2.5% error
+
+```{r}
+ram_data_amp_25 <- sheep_data_amp_25 %>% filter(Castration_Sex=="Ram")
+# Run model, 2.5% error
+model_25p <- lm(YPMP ~ Beta, data=ram_data_amp_25)
+summary(model_25p)
+```
+
+# Data preparation, array
+```{r}
+#read in minfi normalised beta values
+sheep_array_data2 <- read.csv("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Data/array_cg21524116.csv", header=FALSE)
+
+#transpose the dataframe and remove unneeded columns
+sheep_array_data <- as.data.frame(t(sheep_array_data2[,-c(1:2)]))
+
+#read in file for headers and transpose it, assign the headers to the minfi normalised data
+headers <- read.csv("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Data/array_headers.csv", header=FALSE)
+theaders <- as.list(t(headers))
+names(sheep_array_data) <- theaders
+
+sheep_array_data_ear <- sheep_array_data %>% filter(!(Sex=="Blood"))
+
+# Setting AndroAge with predicted time of puberty onset = age minus 0.5 years (i.e estimate to reach puberty at 6 months)
+sheep_array_data_ear$YPMP <- as.numeric(sheep_array_data_ear$Age)-0.5
+sheep_array_data_ear$YPMP[sheep_array_data_ear$Sex=="Wether"] <- 0
+sheep_array_data_ear$YPMP[sheep_array_data_ear$Sex=="Ewe"] <- 0
+```
+
+# Fitting model to array data, sheep ear only
+
+```{r}
+ram_data_array <- sheep_array_data_ear %>% filter(Sex=="Ram")
+# Run model, array data, training on rams
+model_array1 <- lm(YPMP ~ as.numeric(cg21524116), data=ram_data_array)
+summary(model_array1)
+```
+
+
+
+
+
+
+
+ARRAY
+######## applying amplicon data to array clock!
+#### 5 % error amplicon data
+```{r}
+sheep_data_amp_5$cg21524116 <- sheep_data_amp_5$Beta-0.042
+
+sheep_data_amp_5$Array_Model_AndroAge <- predict(model_array1, newdata = sheep_data_amp_5)
+
+Metrics::mdae(actual=sheep_data_amp_5$YPMP, predicted=sheep_data_amp_5$Array_Model_AndroAge)
+# OVERALL MAE = 0.353
+
+sheep_data_amp_5 <- sheep_data_amp_5 %>% 
+  arrange(Age) %>% 
+  dplyr::mutate(index = row_number())
+
+cor(sheep_data_amp_5$YPMP, sheep_data_amp_5$Array_Model_AndroAge, method="pearson")
+# 0.931
+
+compare_array_5 <- ggplot(sheep_data_amp_5, aes(x=YPMP, y=Array_Model_AndroAge, colour=Castration_Sex)) + 
+  geom_point(size=4, alpha=3/4) +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2,4)]) +
+  geom_smooth(method="lm", se=F, colour="#1F6683") +
+  geom_abline(linetype="dashed") +
+  theme_light() +
+    ylab("Model AndroAge (Years)") +
+  xlab("Years Post Male Puberty (YPMP)") +
+  labs(title = "Train: array, Test: ±5% error amplicon",
+              subtitle = "MAE=0.353, cor=0.931") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+  theme(legend.position = "none")
+compare_array_5
+```
+
+# For each sex independently
+
+```{r}
+ram_data_amp_5 <- sheep_data_amp_5 %>% filter(Castration_Sex=="Ram")
+ewe_data_amp_5 <- sheep_data_amp_5 %>% filter(Castration_Sex=="Ewe")
+wether_data_amp_5 <- sheep_data_amp_5 %>% filter(Castration_Sex=="Wether")
+
+Metrics::mdae(actual=ram_data_amp_5$YPMP, predicted=ram_data_amp_5$Array_Model_AndroAge) # 0.519
+Metrics::mdae(actual=ewe_data_amp_5$YPMP, predicted=ewe_data_amp_5$Array_Model_AndroAge) # 0.305
+Metrics::mdae(actual=wether_data_amp_5$YPMP, predicted=wether_data_amp_5$Array_Model_AndroAge) # 0.268
+```
+
+
+
+#### 2.5 % error amplicon data
+```{r}
+sheep_data_amp_25$cg21524116 <- sheep_data_amp_25$Beta-0.042
+
+sheep_data_amp_25$Array_Model_AndroAge <- predict(model_array1, newdata = sheep_data_amp_25)
+
+Metrics::mdae(actual=sheep_data_amp_25$YPMP, predicted=sheep_data_amp_25$Array_Model_AndroAge)
+# OVERALL MAE = 0.295
+
+sheep_data_amp_25 <- sheep_data_amp_25 %>% 
+  arrange(Age) %>% 
+  dplyr::mutate(index = row_number())
+
+cor(sheep_data_amp_25$YPMP, sheep_data_amp_25$Array_Model_AndroAge, method="pearson")
+# 0.928
+
+compare_array_25 <- ggplot(sheep_data_amp_25, aes(x=YPMP, y=Array_Model_AndroAge, colour=Castration_Sex)) + 
+  geom_point(size=4, alpha=3/4) +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2,4)]) +
+  geom_smooth(method="lm", se=F, colour="#1F6683") +
+  geom_abline(linetype="dashed") +
+  theme_light() +
+    ylab("Model AndroAge (Years)") +
+  xlab("Years Post Male Puberty (YPMP)") +
+  labs(title = "Train: array, Test: ±2.5% error amplicon",
+              subtitle = "MAE=0.295, cor=0.928") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+  theme(legend.position = "none")
+compare_array_25
+```
+
+# For each sex independently
+
+```{r}
+ram_data_amp_25 <- sheep_data_amp_25 %>% filter(Castration_Sex=="Ram")
+ewe_data_amp_25 <- sheep_data_amp_25 %>% filter(Castration_Sex=="Ewe")
+wether_data_amp_25 <- sheep_data_amp_25 %>% filter(Castration_Sex=="Wether")
+
+Metrics::mdae(actual=ram_data_amp_25$YPMP, predicted=ram_data_amp_25$Array_Model_AndroAge) # 0.479
+Metrics::mdae(actual=ewe_data_amp_25$YPMP, predicted=ewe_data_amp_25$Array_Model_AndroAge) # 0.273
+Metrics::mdae(actual=wether_data_amp_25$YPMP, predicted=wether_data_amp_25$Array_Model_AndroAge) # 0.252
+```
+
+
+
+### AMPLICON
+
+# Applying array data to amplicon clocks
+#### 5 % error clock
+```{r}
+sheep_array_MKLN1 <- sheep_array_data_ear
+new_colnames <- c("Sample_ID", "Age", "Sex", "BloodSex", "Genotype", "Beta", "YPMP")
+colnames(sheep_array_MKLN1) <- new_colnames
+
+sheep_array_MKLN1$Beta2 <- as.numeric(sheep_array_MKLN1$Beta)
+sheep_array_MKLN1$Beta <- as.numeric(sheep_array_MKLN1$Beta2+0.042)
+
+sheep_array_MKLN1$Amplicon_Model_AndroAge_5 <- predict(model_5p, newdata = sheep_array_MKLN1)
+
+Metrics::mdae(actual=sheep_array_MKLN1$YPMP, predicted=sheep_array_MKLN1$Amplicon_Model_AndroAge_5)
+# OVERALL MAE = 0.285 years
+
+sheep_array_MKLN1 <- sheep_array_MKLN1 %>% 
+  arrange(Age) %>% 
+  dplyr::mutate(index = row_number())
+
+
+cor(sheep_array_MKLN1$YPMP, sheep_array_MKLN1$Amplicon_Model_AndroAge_5, method="pearson")
+
+
+compare_5_array <- ggplot(sheep_array_MKLN1, aes(x=YPMP, y=Amplicon_Model_AndroAge_5, colour=Sex)) + 
+  geom_point(size=4, alpha=3/4) +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2,4)]) +
+  geom_smooth(method="lm", se=F, colour="#1F6683") +
+  geom_abline(linetype="dashed") +
+  theme_light() +
+  ylab("Model AndroAge (Years)") +
+  xlab("Years Post Male Puberty (YPMP)") +
+  labs(title = "Train: ±5% error amplicon, Test: array",
+              subtitle = "MAE=0.285, cor=0.870") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+  theme(legend.position = "none")
+compare_5_array
+```
+
+
+# For each sex independently
+
+```{r}
+ram_array_MKLN1 <- sheep_array_MKLN1 %>% filter(Sex=="Ram")
+ewe_array_MKLN1 <- sheep_array_MKLN1 %>% filter(Sex=="Ewe")
+wether_array_MKLN1 <- sheep_array_MKLN1 %>% filter(Sex=="Wether")
+
+Metrics::mdae(actual=ram_array_MKLN1$YPMP, predicted=ram_array_MKLN1$Amplicon_Model_AndroAge_5) # 0.345
+Metrics::mdae(actual=ewe_array_MKLN1$YPMP, predicted=ewe_array_MKLN1$Amplicon_Model_AndroAge_5) # 0.241
+Metrics::mdae(actual=wether_array_MKLN1$YPMP, predicted=wether_array_MKLN1$Amplicon_Model_AndroAge_5) # 0.301
+```
+
+#### 2.5 % error clock
+```{r}
+sheep_array_MKLN1$Amplicon_Model_AndroAge_25 <- predict(model_25p, newdata = sheep_array_MKLN1)
+
+Metrics::mdae(actual=sheep_array_MKLN1$YPMP, predicted=sheep_array_MKLN1$Amplicon_Model_AndroAge_25)
+# OVERALL MAE = 0.274 years
+
+sheep_array_MKLN1 <- sheep_array_MKLN1 %>% 
+  arrange(Age) %>% 
+  dplyr::mutate(index = row_number())
+
+cor(sheep_array_MKLN1$YPMP, sheep_array_MKLN1$Amplicon_Model_AndroAge_25, method="pearson")
+
+compare_25_array <- ggplot(sheep_array_MKLN1, aes(x=YPMP, y=Amplicon_Model_AndroAge_25, colour=Sex)) + 
+  geom_point(size=4, alpha=3/4) +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2,4)]) +
+  geom_smooth(method="lm", se=F, colour="#1F6683") +
+  geom_abline(linetype="dashed") +
+  theme_light() +
+  ylab("Model AndroAge (Years)") +
+  xlab("Years Post Male Puberty (YPMP)") +
+  labs(title = "Train: ±2.5% error amplicon, Test: array",
+              subtitle = "MAE=0.274, cor=0.870") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+  theme(legend.position = "none")
+compare_25_array
+```
+
+# For each sex independently
+
+```{r}
+ram_array_MKLN1 <- sheep_array_MKLN1 %>% filter(Sex=="Ram")
+ewe_array_MKLN1 <- sheep_array_MKLN1 %>% filter(Sex=="Ewe")
+wether_array_MKLN1 <- sheep_array_MKLN1 %>% filter(Sex=="Wether")
+
+Metrics::mdae(actual=ram_array_MKLN1$YPMP, predicted=ram_array_MKLN1$Amplicon_Model_AndroAge_25) # 0.355
+Metrics::mdae(actual=ewe_array_MKLN1$YPMP, predicted=ewe_array_MKLN1$Amplicon_Model_AndroAge_25) # 0.233
+Metrics::mdae(actual=wether_array_MKLN1$YPMP, predicted=wether_array_MKLN1$Amplicon_Model_AndroAge_25) # 0.284
+```
+
+
+```{r}
+compare_array_amplicon <- cowplot::plot_grid(compare_array_5, compare_array_25, compare_5_array, compare_25_array, labels=c("A", "B", "C", "D"))
+compare_array_amplicon
+
+legend_b <- cowplot::get_legend(
+  compare_5_array + 
+    guides(color = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+
+compare_array_amplicon <- cowplot::plot_grid(compare_array_amplicon,legend_b, ncol=1, rel_heights=c(1,0.1))
+compare_array_amplicon
+
+ggsave("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/array_amplicon_modelfittingcompare_ALL.png",compare_array_amplicon, width=10, height = 10, dpi=1000)
+
+```
+
+
+
+
+
+
+
+# Compare methylation on the array vs amplicon
+```{r}
+compare <- read.csv("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Data/SheepMethylation_AmpliconvsArray.csv")
+
+compare_5 <- compare %>% filter(CG_Calls>=497)
+compare_5$Sex <- ifelse(substr(compare_5$Sample, 1, 3) %in% c("Ram", "RAM"), "Ram",
+                 ifelse(substr(compare_5$Sample, 1, 3) == "BHC", "Ewe",
+                        ifelse(substr(compare_5$Sample, 1, 3) %in% c("Wet", "WET"), "Wether", NA)))
+
+
+comparison_plot <-ggplot(compare_5, aes(y=CG_Methylation, x=(Array*100), colour=Sex)) + 
+  geom_point(size=4, alpha=2/3) +
+  theme_light() +
+  geom_abline(linetype="dashed") +
+  geom_smooth(method="lm", se=F, colour="Black") +
+scale_colour_manual(values = c("#DD3C51", "#313657", "#6C90B9"), name= "Sex", labels = c("Female", "Intact male", "Castrated male")) +  ylab("Amplicon methylation (%)") +
+  xlab("Array methylation (%)") +  
+  ylim(33,86) +
+  theme(legend.position = c(0.80, 0.20),
+        legend.background = element_rect(fill = "white", color = "gray60", linewidth=0.2)) 
+comparison_plot
+
+ggsave("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/compareMethylation_AmpliconArray.png",comparison_plot,width=8,height=8)
+
+
+compare_5_complete <- compare_5[complete.cases(compare_5$Array),]
+
+cor(compare_5_complete$Array, compare_5_complete$CG_Methylation, method="pearson")
+# 0.912
+
+compare_5_complete$difference <- compare_5_complete$CG_Methylation - (compare_5_complete$Array*100)
+mean(as.numeric(compare_5_complete$difference), na.rm = TRUE)
+# 4.23% 
+```
+
+```{r}
+MKLN1_sheep_5 <- ggplot(sheep_data_amp_5, aes(x=Age, y=CG_Methylation, 
+                                          colour=Castration_Sex)) +
+  geom_jitter(width=0.1, size=4, alpha=2/3) +
+  geom_smooth(method="lm") +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2,4)]) +
+  scale_colour_manual(values = c("#DD3C51", "#313657", "#6C90B9"), name= "Sex", labels = c("Female", "Intact male", "Castrated male")) +  ylab("Amplicon methylation (%)") +
+  theme_light() +
+  theme(legend.position="none") +
+  ylab("Methylation (%)") +
+  xlab("Age (Years)") +
+  ylim(33,86) +
+theme(legend.position="bottom") +
+  guides(colour = guide_legend(title.position = "top", title.hjust=0.5))
+
+MKLN1_sheep_5
+```
+
+```{r}
+neck_new <- read.csv("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Data/NeckData_2024.csv")
+neck <- neck_new %>% filter(Tissue=="Muscle")
+neck$Beta <- neck$Methylation/100
+neck$A <- "A"
+
+neckmeth <- ggplot(neck, aes(x = Methylation, y = Group, colour = Age_Colour)) +
+  geom_jitter(height = 0.1, size = 4, alpha = 2/3) +
+  scale_colour_manual(values = c("#DD3C51", "#BFEFFF", "#66A3D2", "#336699", "#001F3F", "#CCCCCC")) +
+  scale_shape_manual(values = c("Lamb" = 17, "Aged Ram" = 16)) +  # Defining shapes for the groups
+  theme_light() +
+  xlab("Methylation (%)") +
+  scale_x_continuous(breaks = seq(20, 70, 5)) +
+  theme(legend.position = "bottom", legend.box.margin = margin(0, 60, 0, 0)) +
+  guides(colour = guide_legend(nrow=1), shape = FALSE) +
+  labs(colour = "Age")
+
+neckmeth
+
+ggsave("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Revision/New_SheepNeck.png",neckmeth, width=10, height = 4, dpi=1000)
+```
+
+
+
+correlation plot between aged ram neck methylation and ear methylation
+```{r}
+compare_agedrams <- neck_new[56:73,2:6]
+wide_compare_agedrams <- spread(compare_agedrams, key = Tissue, value = Methylation)
+
+compare_earmuscle <- ggplot(wide_compare_agedrams, aes(x=Ear, y=Muscle)) +
+  geom_point(size=4, alpha=2/3) +
+  geom_smooth(method="lm", se=F, colour="Black", linetype="dashed") +
+  labs(title="Correlation between aged ram neck muscle methylation and ear methylation", subtitle="cor=0.438 (Pearson)")
+
+compare_earmuscle
+
+correlation <- cor(wide_compare_agedrams$Ear, wide_compare_agedrams$Muscle, method = "pearson")
+correlation
+# 0.438
+
+n <- length(wide_compare_agedrams$Ear)
+degrees_of_freedom <- n - 2  
+t_statistic <- correlation * sqrt((n - 2)/(1 - correlation^2))
+p_value <- 2 * pt(abs(t_statistic), df = degrees_of_freedom, lower.tail = FALSE) 
+p_value
+# 0.238 - not significant
+
+ggsave("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Revision/CompareMethylation_AgedRam_EarMuscle.png",compare_earmuscle, width=8, height = 5, dpi=1000)
+```
+
+correlation plot between aged ram age and neck muscle methylation 
+```{r}
+wide_compare_agedrams2 <- wide_compare_agedrams %>% filter(!(Age=="??"))
+wide_compare_agedrams2$Age <- as.numeric(wide_compare_agedrams2$Age)
+
+compare_muscleAge <- ggplot(wide_compare_agedrams2, aes(x=Muscle, y=Age)) +
+  geom_point(size=4, alpha=2/3) +
+  geom_smooth(method="lm", se=F, colour="Black", linetype="dashed") +
+  labs(title="Correlation between aged ram neck muscle methylation and age", subtitle="cor=-0.551 (Pearson)")
+
+compare_muscleAge
+
+correlation <- cor(wide_compare_agedrams2$Age, wide_compare_agedrams2$Muscle, method = "pearson")
+correlation
+# -0.551
+
+n <- length(wide_compare_agedrams$Age)
+degrees_of_freedom <- n - 2  
+t_statistic <- correlation * sqrt((n - 2)/(1 - correlation^2))
+p_value <- 2 * pt(abs(t_statistic), df = degrees_of_freedom, lower.tail = FALSE) 
+p_value
+# 0.123 - not significant
+
+
+allaged <- neck_new[55:73,]
+allaged_muscle <- allaged %>% filter(Tissue=="Muscle")
+mean(allaged_muscle$Methylation)
+# 33.05511
+
+sd(allaged_muscle$Methylation)
+# 5.528597 
+
+ggsave("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Revision/Compare_AgedRam_Muscle_Age.png",compare_muscleAge, width=8, height = 5, dpi=1000)
+```
+
+correlation plot between aged ram age and ear methylation 
+```{r}
+compare_earAge <- ggplot(wide_compare_agedrams2, aes(x=Ear, y=Age)) +
+  geom_point(size=4, alpha=2/3) +
+  geom_smooth(method="lm", se=F, colour="Black", linetype="dashed") +
+  labs(title="Correlation between aged ram ear methylation and age", subtitle="cor=-0.784 (Pearson)")
+
+compare_earAge
+
+correlation <- cor(wide_compare_agedrams2$Age, wide_compare_agedrams2$Ear, method = "pearson")
+correlation
+# -0.784
+
+n <- length(wide_compare_agedrams$Age)
+degrees_of_freedom <- n - 2  
+t_statistic <- correlation * sqrt((n - 2)/(1 - correlation^2))
+p_value <- 2 * pt(abs(t_statistic), df = degrees_of_freedom, lower.tail = FALSE) 
+p_value
+# 0.0123 - significant
+
+
+ggsave("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Revision/Compare_AgedRam_Ear_Age.png",compare_earAge, width=8, height = 5, dpi=1000)
+```
+
+```{r}
+cowplot::plot_grid(compare_earmuscle, compare_muscleAge, compare_earAge)
+```
+
+```{r}
+lambs <- neck_new[1:54,]
+
+mean(as.numeric(lambs$Methylation), na.rm = TRUE)
+# 54.83655
+
+sd(lambs$Methylation)
+# 4.796971
+
+```
+
+# t test of the difference in means between lambs and aged rams
+```{r}
+t.test(neck$Methylation~neck$Group)
+```
+
+
+```{r}
+wilcox.test(Methylation~Group, data=neck)
+```
+
+
+
+```{r}
+fig1 <- cowplot::plot_grid(NULL, comparison_plot, NULL, neckmeth, ncol=1, rel_heights = c(1, 1,0.05,0.4), align="v", labels=c("A", "B", "", "C"))
+fig1
+
+ggsave("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Revision/FinalFigures/Figure1_noCohort.png",fig1, width=6, height = 12, dpi=1000)
+```
+
+
+
+
+
+
+
+
+
+# uncorrected beta values 
+
+
+ARRAY
+######## applying amplicon data to array clock!
+#### 5 % error amplicon data
+```{r}
+sheep_data_amp_5$cg21524116 <- sheep_data_amp_5$Beta
+
+sheep_data_amp_5$Array_Model_AndroAge <- predict(model_array1, newdata = sheep_data_amp_5)
+
+Metrics::mdae(actual=sheep_data_amp_5$YPMP, predicted=sheep_data_amp_5$Array_Model_AndroAge)
+# OVERALL MAE = 0.681
+
+sheep_data_amp_5 <- sheep_data_amp_5 %>% 
+  arrange(Age) %>% 
+  dplyr::mutate(index = row_number())
+
+cor(sheep_data_amp_5$YPMP, sheep_data_amp_5$Array_Model_AndroAge, method="pearson")
+# 0.931
+
+compare_array_5_uncorrected <- ggplot(sheep_data_amp_5, aes(x=YPMP, y=Array_Model_AndroAge, colour=Castration_Sex)) + 
+  geom_point(size=4, alpha=3/4) +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2,4)]) +
+  geom_smooth(method="lm", se=F, colour="#1F6683") +
+  geom_abline(linetype="dashed") +
+  theme_light() +
+    ylab("Model AndroAge (Years)") +
+  xlab("Years Post Male Puberty (YPMP)") +
+  labs(title = "Train: array, Test: ±5% error amplicon",
+              subtitle = "MAE=0.681, cor=0.931") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+  theme(legend.position = "none")
+compare_array_5_uncorrected
+```
+
+# For each sex independently
+
+```{r}
+ram_data_amp_5 <- sheep_data_amp_5 %>% filter(Castration_Sex=="Ram")
+ewe_data_amp_5 <- sheep_data_amp_5 %>% filter(Castration_Sex=="Ewe")
+wether_data_amp_5 <- sheep_data_amp_5 %>% filter(Castration_Sex=="Wether")
+
+Metrics::mdae(actual=ram_data_amp_5$YPMP, predicted=ram_data_amp_5$Array_Model_AndroAge) # 0.736
+Metrics::mdae(actual=ewe_data_amp_5$YPMP, predicted=ewe_data_amp_5$Array_Model_AndroAge) # 0.776
+Metrics::mdae(actual=wether_data_amp_5$YPMP, predicted=wether_data_amp_5$Array_Model_AndroAge) # 0.510
+```
+
+
+
+#### 2.5 % error amplicon data
+```{r}
+sheep_data_amp_25$cg21524116 <- sheep_data_amp_25$Beta
+
+sheep_data_amp_25$Array_Model_AndroAge <- predict(model_array1, newdata = sheep_data_amp_25)
+
+Metrics::mdae(actual=sheep_data_amp_25$YPMP, predicted=sheep_data_amp_25$Array_Model_AndroAge)
+# OVERALL MAE = 0.675
+
+sheep_data_amp_25 <- sheep_data_amp_25 %>% 
+  arrange(Age) %>% 
+  dplyr::mutate(index = row_number())
+
+cor(sheep_data_amp_25$YPMP, sheep_data_amp_25$Array_Model_AndroAge, method="pearson")
+# 0.928
+
+compare_array_25_uncorrected <- ggplot(sheep_data_amp_25, aes(x=YPMP, y=Array_Model_AndroAge, colour=Castration_Sex)) + 
+  geom_point(size=4, alpha=3/4) +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2,4)]) +
+  geom_smooth(method="lm", se=F, colour="#1F6683") +
+  geom_abline(linetype="dashed") +
+  theme_light() +
+    ylab("Model AndroAge (Years)") +
+  xlab("Years Post Male Puberty (YPMP)") +
+  labs(title = "Train: array, Test: ±2.5% error amplicon",
+              subtitle = "MAE=0.675, cor=0.928") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+  theme(legend.position = "none")
+compare_array_25_uncorrected
+```
+
+# For each sex independently
+
+```{r}
+ram_data_amp_25 <- sheep_data_amp_25 %>% filter(Castration_Sex=="Ram")
+ewe_data_amp_25 <- sheep_data_amp_25 %>% filter(Castration_Sex=="Ewe")
+wether_data_amp_25 <- sheep_data_amp_25 %>% filter(Castration_Sex=="Wether")
+
+Metrics::mdae(actual=ram_data_amp_25$YPMP, predicted=ram_data_amp_25$Array_Model_AndroAge) # 0.621
+Metrics::mdae(actual=ewe_data_amp_25$YPMP, predicted=ewe_data_amp_25$Array_Model_AndroAge) # 0.805
+Metrics::mdae(actual=wether_data_amp_25$YPMP, predicted=wether_data_amp_25$Array_Model_AndroAge) # 0.609
+```
+
+
+
+### AMPLICON
+
+# Applying array data to amplicon clocks
+#### 5 % error clock
+```{r}
+sheep_array_MKLN1 <- sheep_array_data_ear
+new_colnames <- c("Sample_ID", "Age", "Sex", "BloodSex", "Genotype", "Beta", "YPMP")
+colnames(sheep_array_MKLN1) <- new_colnames
+
+sheep_array_MKLN1$Beta <- as.numeric(sheep_array_MKLN1$Beta)
+
+sheep_array_MKLN1$Amplicon_Model_AndroAge_5 <- predict(model_5p, newdata = sheep_array_MKLN1)
+
+Metrics::mdae(actual=sheep_array_MKLN1$YPMP, predicted=sheep_array_MKLN1$Amplicon_Model_AndroAge_5)
+# OVERALL MAE = 0.667 years
+
+sheep_array_MKLN1 <- sheep_array_MKLN1 %>% 
+  arrange(Age) %>% 
+  dplyr::mutate(index = row_number())
+
+
+cor(sheep_array_MKLN1$YPMP, sheep_array_MKLN1$Amplicon_Model_AndroAge_5, method="pearson")
+
+
+compare_5_array_uncorrected <- ggplot(sheep_array_MKLN1, aes(x=YPMP, y=Amplicon_Model_AndroAge_5, colour=Sex)) + 
+  geom_point(size=4, alpha=3/4) +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2,4)]) +
+  geom_smooth(method="lm", se=F, colour="#1F6683") +
+  geom_abline(linetype="dashed") +
+  theme_light() +
+  ylab("Model AndroAge (Years)") +
+  xlab("Years Post Male Puberty (YPMP)") +
+  labs(title = "Train: ±5% error amplicon, Test: array",
+              subtitle = "MAE=0.667, cor=0.870") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+  theme(legend.position = "none")
+compare_5_array_uncorrected
+```
+
+
+# For each sex independently
+
+```{r}
+ram_array_MKLN1 <- sheep_array_MKLN1 %>% filter(Sex=="Ram")
+ewe_array_MKLN1 <- sheep_array_MKLN1 %>% filter(Sex=="Ewe")
+wether_array_MKLN1 <- sheep_array_MKLN1 %>% filter(Sex=="Wether")
+
+Metrics::mdae(actual=ram_array_MKLN1$YPMP, predicted=ram_array_MKLN1$Amplicon_Model_AndroAge_5) # 0.813
+Metrics::mdae(actual=ewe_array_MKLN1$YPMP, predicted=ewe_array_MKLN1$Amplicon_Model_AndroAge_5) # 0.580
+Metrics::mdae(actual=wether_array_MKLN1$YPMP, predicted=wether_array_MKLN1$Amplicon_Model_AndroAge_5) # 0.749
+```
+
+#### 2.5 % error clock
+```{r}
+sheep_array_MKLN1$Amplicon_Model_AndroAge_25 <- predict(model_25p, newdata = sheep_array_MKLN1)
+
+Metrics::mdae(actual=sheep_array_MKLN1$YPMP, predicted=sheep_array_MKLN1$Amplicon_Model_AndroAge_25)
+# OVERALL MAE = 0.675 years
+
+sheep_array_MKLN1 <- sheep_array_MKLN1 %>% 
+  arrange(Age) %>% 
+  dplyr::mutate(index = row_number())
+
+cor(sheep_array_MKLN1$YPMP, sheep_array_MKLN1$Amplicon_Model_AndroAge_25, method="pearson")
+
+compare_25_array_uncorrected <- ggplot(sheep_array_MKLN1, aes(x=YPMP, y=Amplicon_Model_AndroAge_25, colour=Sex)) + 
+  geom_point(size=4, alpha=3/4) +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2,4)]) +
+  geom_smooth(method="lm", se=F, colour="#1F6683") +
+  geom_abline(linetype="dashed") +
+  theme_light() +
+  ylab("Model AndroAge (Years)") +
+  xlab("Years Post Male Puberty (YPMP)") +
+  labs(title = "Train: ±2.5% error amplicon, Test: array",
+              subtitle = "MAE=0.675, cor=0.870") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+  theme(legend.position = "none")
+compare_25_array_uncorrected
+```
+
+# For each sex independently
+
+```{r}
+ram_array_MKLN1 <- sheep_array_MKLN1 %>% filter(Sex=="Ram")
+ewe_array_MKLN1 <- sheep_array_MKLN1 %>% filter(Sex=="Ewe")
+wether_array_MKLN1 <- sheep_array_MKLN1 %>% filter(Sex=="Wether")
+
+Metrics::mdae(actual=ram_array_MKLN1$YPMP, predicted=ram_array_MKLN1$Amplicon_Model_AndroAge_25) # 0.786
+Metrics::mdae(actual=ewe_array_MKLN1$YPMP, predicted=ewe_array_MKLN1$Amplicon_Model_AndroAge_25) # 0.592
+Metrics::mdae(actual=wether_array_MKLN1$YPMP, predicted=wether_array_MKLN1$Amplicon_Model_AndroAge_25) # 0.753
+```
+
+
+```{r}
+compare_array_amplicon_uncorrected <- cowplot::plot_grid(compare_array_5_uncorrected, compare_array_25_uncorrected, compare_5_array_uncorrected, compare_25_array_uncorrected, labels=c("A", "B", "C", "D"), nrow=1)
+compare_array_amplicon_uncorrected
+
+legend_b <- cowplot::get_legend(
+  compare_5_array + 
+    guides(color = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom")
+)
+
+compare_array_amplicon_uncorrected <- cowplot::plot_grid(compare_array_amplicon_uncorrected,legend_b, ncol=1, rel_heights=c(1,0.1))
+compare_array_amplicon_uncorrected
+
+ggsave("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/array_amplicon_modelfittingcompare_ALL.png",compare_array_amplicon, width=10, height = 10, dpi=1000)
+
+```
+
+
+
+# Making a plot to show the difference between corrected and uncorrected clock fits
+```{r}
+compare_array_5 <- compare_array_5 + ggtitle("Train: array; Test: amplicon") + ylab("AndroAge (Years)")
+compare_5_array <- compare_5_array + ggtitle("Train: amplicon, Test: array") + ylab("AndroAge (Years)")
+compare_array_5_uncorrected <- compare_array_5_uncorrected + ggtitle("Train: array; Test: amplicon") + ylab("AndroAge (Years)")
+compare_5_array_uncorrected <- compare_5_array_uncorrected + ggtitle("Train: amplicon, Test: array") + ylab("AndroAge (Years)")
+
+corrected <- cowplot::plot_grid(compare_array_5, compare_5_array, labels=c("C","D"))
+uncorrected <- cowplot::plot_grid(compare_array_5_uncorrected, compare_5_array_uncorrected, labels=c("A", "B"))
+```
+
+
+```{r}
+corrected_labelled <- cowplot::plot_grid(
+  ggdraw() + draw_label("Adjusted values", fontface = 'bold', size = 15, hjust = 0.5),
+  corrected,
+  ncol = 1,
+  rel_heights = c(0.1, 1)
+)
+
+corrected_labelled
+```
+
+```{r}
+uncorrected_labelled <- cowplot::plot_grid(
+  ggdraw() + draw_label("Raw values", fontface = 'bold', size = 15, hjust = 0.5),
+  uncorrected,
+  ncol = 1,
+  rel_heights = c(0.1, 1) 
+)
+
+uncorrected_labelled
+```
+
+```{r}
+legend_c <- cowplot::get_legend(
+  MKLN1_sheep_5 + 
+    guides(color = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom") +
+            guides(colour = guide_legend(title.position = "top", title.hjust=0.5))
+)
+
+
+comparison_adjust <- cowplot::plot_grid(uncorrected_labelled, corrected_labelled, legend_c, ncol=1, rel_heights = c(1, 1, 0.1))
+comparison_adjust 
+
+ggsave("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Revision/FinalFigures/FigureSX_CompareAdjustment.png", comparison_adjust, width=8, height=10, dpi=1000)
+```
+

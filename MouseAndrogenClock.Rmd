@@ -1,0 +1,360 @@
+---
+title: "Mouse Androgen Clock Construction"
+author: "Victoria Sugrue"
+date: 'Last updated: 26 July 2024'
+output:
+  word_document:
+    toc: no
+    toc_depth: '6'
+  html_document:
+    toc: no
+    toc_float: no
+    toc_depth: 6
+  pdf_document:
+    toc: no
+    toc_depth: 5
+    df_print: kable
+    latex_engine: xelatex
+subtitle: ' '
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load required packages
+```{r}
+library(ggplot2)
+library(caret)
+library(dplyr)
+library(Manu)
+library(knitr)
+library(lmtest)
+library(ggfortify)
+library(cowplot)
+```
+
+# Data preparation
+```{r}
+mouse_data <- read.csv("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Data/Mouse_ArrayData_Full_TailMuscle.csv")
+mouse_data <- mouse_data %>% filter(Tissue=="Muscle" | Tissue=="Tail")
+
+# Setting AndroAge with predicted time of puberty onset = age minus 6 weeks, adjust to 0 where negative
+mouse_data$YPMP <- mouse_data$Age-0.115068
+mouse_data$YPMP[mouse_data$Sex=="F"] <- 0
+mouse_data$YPMP[mouse_data$YPMP < 0] <- 0
+
+# Change sex labels
+mouse_data$Sex[mouse_data$Sex=="F"] <- "Female"
+mouse_data$Sex[mouse_data$Sex=="M"] <- "Male"
+
+# Subset by tissue
+mouse_muscle <- mouse_data %>% filter(Tissue=="Muscle")
+mouse_tail <- mouse_data %>% filter(Tissue=="Tail")
+
+# Subset by sex
+male_muscle <- mouse_muscle %>% filter(Sex=="Male")
+female_muscle <- mouse_muscle %>% filter(Sex=="Female")
+male_tail <- mouse_tail %>% filter(Sex=="Male")
+female_tail <- mouse_tail %>% filter(Sex=="Female")
+```
+
+
+# A birds-eye view of the data 
+
+```{r}
+# Age distribution
+age_dist <- ggplot(mouse_data, aes(x = Age)) +
+  geom_histogram(aes(fill = Tissue), position = "dodge", alpha = 1, bins = 15) +
+  scale_fill_manual(values = get_pal("Takahe")) +
+  theme_light() +
+  facet_grid(~Sex) +
+  labs(title = "Distribution of age by sex (Mouse, array)", fill = "Sex", x="Age (Years)") +
+  ylab("Frequency")
+age_dist
+```
+
+```{r}
+#or, by tissue
+age_dist_tis <- ggplot(mouse_data, aes(x = Age)) +
+  geom_histogram(aes(fill = Sex), position = "dodge", alpha = 1, bins = 15) +
+  scale_fill_manual(values = get_pal("Takahe")[c(1,2,4)]) +
+  theme_light() +
+  facet_wrap(~Tissue, ncol=3, scales="free") +
+  labs(title = "Distribution of age by sex (Mouse, array)", fill = "Sex", x="Age (Years)") +
+  ylab("Frequency")
+age_dist_tis
+```
+
+# Plotting methylation data
+
+```{r}
+MKLN1_mice <- ggplot(mouse_data, aes(x=Age, y=cg21524116*100, colour=Sex)) +
+  geom_jitter(width=0.05, size=2.5, alpha=2/3) +
+  geom_smooth(method="lm") +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2,4)]) +
+  theme_light() +
+  facet_wrap(~Tissue, ncol=3, scales="free") +
+  labs(colour="Sex", y="Methylation (%)", x="Age (Years)")
+MKLN1_mice
+```
+
+Testing both tissues
+
+##### Tail #####
+
+# Fit androgen clock to mouse tail
+```{r}
+tail_model <- lm(YPMP ~ cg21524116, data=male_tail) 
+summary(tail_model)
+```
+
+# Diagnostic plots
+
+```{r}
+autoplot(tail_model, which=c(1,2,3,5), size=3, alpha=4/5, colour="#313657", smooth.colour="#DD3C51", smooth.linetype="dashed", label.size = 3) + theme_light() + theme(plot.title = element_text(color = "white"))
+```
+
+```{r}
+fitted_tail <- as.data.frame(tail_model$fitted.values)
+colnames(fitted_tail)[1] <- "Predicted_AndroAge"
+fitted_tail["YPMP"] <- male_tail$YPMP
+fitted_tail$YPMP <- as.numeric(fitted_tail$YPMP)
+```
+
+# Calculating error
+## All
+
+```{r}
+Metrics::mdae(actual=fitted_tail$YPMP, predicted=fitted_tail$Predicted_AndroAge)
+# 0.117
+
+cor.test(fitted_tail$YPMP, fitted_tail$Predicted_AndroAge, method="pearson")
+# 0.802
+```
+
+```{r}
+tail_modelfit <- ggplot(fitted_tail, aes(x=YPMP, y=Predicted_AndroAge)) +
+  geom_point(size=4, alpha=3/4, colour="#313657") + 
+  geom_smooth(method="lm", se=F, colour="#DD3C51") +
+  geom_abline(linetype="dashed") +
+  theme_light() +
+  ylab("Model AndroAge (Years)") +
+  xlab("Years Post Male Puberty (YPMP)") +
+    labs(title = "Tail",
+              subtitle = "MAE=0.117, cor=0.802") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5))
+tail_modelfit
+```
+
+# Leave-one-out cross validation
+
+```{r}
+male_tail$cg21524116 <- as.numeric(male_tail$cg21524116)
+male_tail$YPMP <- as.numeric(male_tail$YPMP)
+ctrl <- trainControl(method="LOOCV", savePredictions = TRUE)
+tail_modelLOO <- train(YPMP ~ cg21524116, data=male_tail, method="lm", trControl=ctrl)
+summary(tail_modelLOO)
+print(tail_modelLOO)
+```
+
+```{r}
+fitted_LOO_tail <- as.data.frame(tail_modelLOO$pred)
+colnames(fitted_LOO_tail)[1] <- "Predicted_AndroAge_LOO"
+colnames(fitted_LOO_tail)[2] <- "YPMP"
+
+male_tail$Predicted_AndroAge_LOO <- fitted_LOO_tail$Predicted_AndroAge_LOO
+
+Metrics::mdae(actual=male_tail$Predicted_AndroAge_LOO, predicted=male_tail$YPMP)
+# 0.123
+
+cor.test(male_tail$YPMP, male_tail$Predicted_AndroAge_LOO, method="pearson")
+# 0.782
+```
+
+# Apply to whole dataset
+```{r}
+mouse_tail$Predicted_AndroAge <- predict(tail_model, newdata = mouse_tail)
+
+Metrics::mdae(actual=mouse_tail$Predicted_AndroAge, predicted=mouse_tail$YPMP) # 0.114
+cor.test(mouse_tail$YPMP, mouse_tail$Predicted_AndroAge, method="pearson") # 0.814
+```
+
+
+# For each sex independently
+```{r}
+male_tail <- mouse_tail %>% filter(Sex=="Male") 
+Metrics::mdae(actual=male_tail$Predicted_AndroAge, predicted=male_tail$YPMP) # 0.117
+cor.test(male_tail$YPMP, male_tail$Predicted_AndroAge, method="pearson") # 0.802
+
+female_tail <- mouse_tail %>% filter(Sex=="Female")
+Metrics::mdae(actual=female_tail$Predicted_AndroAge, predicted=female_tail$YPMP) # 0.113
+```
+
+```{r}
+obs_exp_mousetail_model <- ggplot(mouse_tail, aes(x=YPMP, y=Predicted_AndroAge, colour=Sex)) +
+ geom_point(size=4, alpha=3/4) + 
+  geom_smooth(method="lm", se=F, colour="#1F6683") +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2)]) +
+  theme_light() +
+  geom_abline(linetype="dashed") +
+  ylab("Model AndroAge (Years)") +
+  xlab("Years Post Male Puberty (YPMP)") +
+  labs(title="Tail", subtitle="MAE=0.114, cor=0.814") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+  theme(legend.position = "none") 
+obs_exp_mousetail_model
+```
+
+
+
+
+
+
+##### Muscle #####
+
+# Fit androgen clock to mouse muscle
+```{r}
+muscle_model <- lm(YPMP ~ cg21524116, data=male_muscle) 
+summary(muscle_model)
+```
+
+# Diagnostic plots
+
+```{r}
+autoplot(muscle_model, which=c(1,2,3,5), size=3, alpha=4/5, colour="#313657", smooth.colour="#DD3C51", smooth.linetype="dashed", label.size = 3) + theme_light() + theme(plot.title = element_text(color = "white"))
+```
+
+```{r}
+fitted_muscle <- as.data.frame(muscle_model$fitted.values)
+colnames(fitted_muscle)[1] <- "Predicted_AndroAge"
+fitted_muscle["YPMP"] <- male_muscle$YPMP
+fitted_muscle$YPMP <- as.numeric(fitted_muscle$YPMP)
+```
+
+# Calculating error
+## All
+
+```{r}
+Metrics::mdae(actual=fitted_muscle$YPMP, predicted=fitted_muscle$Predicted_AndroAge)
+# 0.488
+
+cor.test(fitted_muscle$YPMP, fitted_muscle$Predicted_AndroAge, method="pearson")
+# 0.634
+```
+
+```{r}
+muscle_modelfit <- ggplot(fitted_muscle, aes(x=YPMP, y=Predicted_AndroAge)) +
+  geom_point(size=4, alpha=3/4, colour="#313657") + 
+  geom_smooth(method="lm", se=F, colour="#DD3C51") +
+  geom_abline(linetype="dashed") +
+  theme_light() +
+  ylab("Model AndroAge (Years)") +
+  xlab("Years Post Male Puberty (YPMP)") +
+    labs(title = "Muscle",
+              subtitle = "MAE=0.488, cor=0.634") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5))
+muscle_modelfit
+```
+
+# Leave-one-out cross validation
+
+```{r}
+male_muscle$cg21524116 <- as.numeric(male_muscle$cg21524116)
+male_muscle$YPMP <- as.numeric(male_muscle$YPMP)
+ctrl <- trainControl(method="LOOCV", savePredictions = TRUE)
+muscle_modelLOO <- train(YPMP ~ cg21524116, data=male_muscle, method="lm", trControl=ctrl)
+summary(muscle_modelLOO)
+print(muscle_modelLOO)
+```
+
+```{r}
+fitted_LOO_muscle <- as.data.frame(muscle_modelLOO$pred)
+colnames(fitted_LOO_muscle)[1] <- "Predicted_AndroAge_LOO"
+colnames(fitted_LOO_muscle)[2] <- "YPMP"
+
+male_muscle$Predicted_AndroAge_LOO <- fitted_LOO_muscle$Predicted_AndroAge_LOO
+
+Metrics::mdae(actual=male_muscle$Predicted_AndroAge_LOO, predicted=male_muscle$YPMP)
+# 0.500
+
+cor.test(male_muscle$YPMP, male_muscle$Predicted_AndroAge_LOO, method="pearson")
+# 0.626
+```
+
+# Apply to whole dataset
+```{r}
+mouse_muscle$Predicted_AndroAge <- predict(muscle_model, newdata = mouse_muscle)
+
+Metrics::mdae(actual=mouse_muscle$Predicted_AndroAge, predicted=mouse_muscle$YPMP) # 0.419
+cor.test(mouse_muscle$YPMP, mouse_muscle$Predicted_AndroAge, method="pearson") # 0.754
+```
+
+
+# For each sex independently
+```{r}
+male_muscle <- mouse_muscle %>% filter(Sex=="Male") 
+Metrics::mdae(actual=male_muscle$Predicted_AndroAge, predicted=male_muscle$YPMP) # 0.488
+cor.test(male_muscle$YPMP, male_muscle$Predicted_AndroAge, method="pearson") # 0.634
+
+female_muscle <- mouse_muscle %>% filter(Sex=="Female")
+Metrics::mdae(actual=female_muscle$Predicted_AndroAge, predicted=female_muscle$YPMP) # 0.289
+```
+
+
+
+```{r}
+obs_exp_mousemuscle_model <- ggplot(mouse_muscle, aes(x=YPMP, y=Predicted_AndroAge, colour=Sex)) +
+ geom_point(size=4, alpha=3/4) + 
+  geom_smooth(method="lm", se=F, colour="#1F6683") +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2)]) +
+  theme_light() +
+  geom_abline(linetype="dashed") +
+  ylab("Model AndroAge (Years)") +
+  xlab("Years Post Male Puberty (YPMP)") +
+  labs(title="Muscle", subtitle="MAE=0.419, cor=0.754") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+  theme(legend.position = "none") 
+obs_exp_mousemuscle_model
+```
+
+
+# Plot together
+```{r}
+legend_b <- get_legend(
+  obs_exp_mousetail_model + guides(color = guide_legend(nrow = 1)) +
+    theme(legend.position = "bottom"))
+
+mousemodels1 <- cowplot::plot_grid(obs_exp_mousetail_model, obs_exp_mousemuscle_model, nrow=1, labels=c("B", "C"))
+
+mousemodels <- cowplot::plot_grid(mousemodels1, legend_b, nrow=2, rel_heights = c(1,0.1))
+mousemodels
+
+mousemodels_cohortspace <- cowplot::plot_grid(NULL, mousemodels, ncol=1, rel_heights = c(0.85,1), labels=c("A"))
+
+ggsave("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Revision/FinalFigures/Figure3_noCohort.png",mousemodels_cohortspace, width=8, height = 8, dpi=1000)
+```
+
+
+Plotting female model_AndroAge
+```{r}
+mouse_tail_female <- mouse_tail %>% filter(Sex=="Female") 
+
+plot1 <- ggplot(mouse_tail_female, aes(x=Age, y=Predicted_AndroAge)) +
+  geom_point(size=5, alpha=2/3) +
+  ggtitle("Chronological Age vs modelled AndroAge, Female mice only") +
+  theme_light() +
+  ylab("AndroAge (Years)") +
+  xlab("Chronological Age (Years)") +
+  geom_hline(yintercept=0, linetype="dashed") +
+  ylim(-1, 1)
+
+plot1
+```
+
+
+

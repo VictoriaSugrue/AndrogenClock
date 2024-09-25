@@ -1,0 +1,897 @@
+---
+title: "DHT Mice"
+author: "Victoria Sugrue"
+date: 'Last updated: 5 August 2024'
+output:
+  word_document:
+    toc: no
+    toc_depth: '7'
+  html_document:
+    toc: no
+    toc_float: yes
+    toc_depth: 7
+  pdf_document:
+    toc: no
+    toc_depth: 5
+    df_print: kable
+    latex_engine: xelatex
+subtitle: ' '
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data preparation
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(cowplot)
+library(Manu)
+library(ggpubr)
+
+data <- read.csv("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Revision/MouseModels_June2024.csv")
+data$Beta_corrected <- data$Beta-0.042
+capsuleDHTdata2 <- data %>% filter(Experiment=="CapsuleDHT")
+capsuleDHTdata <- capsuleDHTdata2 %>% filter(!(Treatment=="DHTLOST"))
+prenatalDHTdata <- data %>% filter(Experiment=="PrenatalDHT")
+ARKOdata <- data %>% filter(Experiment=="ARKO")
+VGlutdata <- data %>% filter(Experiment=="Vglut")
+
+capsuleDHTdata <- capsuleDHTdata %>% mutate(Treatment = ifelse(Treatment == "DHT", "C-DHT", Treatment))
+capsuleDHTdata$Treatment <- factor(capsuleDHTdata$Treatment, levels = c("Control", "C-DHT"))
+```
+
+# Capsule DHT mice
+
+```{r}
+capsule_ear <- capsuleDHTdata %>% filter(Tissue=="Ear")
+capsule_tail <- capsuleDHTdata %>% filter(Tissue=="Tail")
+capsule_muscle <- capsuleDHTdata %>% filter(Tissue=="Muscle")
+capsule_liver <- capsuleDHTdata %>% filter(Tissue=="Liver")
+capsule_kidney <- capsuleDHTdata %>% filter(Tissue=="Kidney")
+```
+
+# Ear
+
+## Plot
+```{r}
+DHTear <- ggplot(capsule_ear, aes(x=Treatment, y=CG.methylation, colour=Treatment)) +
+  geom_boxplot(varwidth=T) + 
+  geom_point(size=5, alpha=4/6) +
+  labs(title="Ear", 
+       x="Treatment",
+       y="Methylation (%)") +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2)]) +
+  theme_light() +
+  theme(legend.position = "none") + 
+  theme(text = element_text(size = 20))
+DHTear
+```
+
+## Statistics 
+
+### T test
+```{r}
+t.test(capsule_ear$CG.methylation~capsule_ear$Treatment)
+
+```
+
+### Correlation between methylation and weight
+```{r}
+ear_DHT <- capsule_ear %>% filter(Treatment=="C-DHT")
+cor.test(ear_DHT$CG.methylation, ear_DHT$Weight)
+
+ear_Control <- capsule_ear %>% filter(Treatment=="Control")
+cor.test(ear_Control$CG.methylation, ear_Control$Weight)
+```
+
+
+# Tail
+
+## Plot
+```{r}
+DHTtail <- ggplot(capsule_tail, aes(x=Treatment, y=CG.methylation, colour=Treatment)) +
+  geom_boxplot(varwidth=T) + 
+  geom_point(size=5, alpha=4/6) +
+  labs(title="Tail", 
+       x="Treatment",
+       y="Methylation (%)") +
+  theme_light() +
+    scale_colour_manual(values = get_pal("Takahe")[c(1,2)]) +
+  theme(legend.position = "none") + 
+  theme(text = element_text(size = 20)) 
+DHTtail
+```
+
+## Statistics 
+
+### T test
+```{r}
+t.test(capsule_tail$CG.methylation~capsule_tail$Treatment)
+
+```
+
+
+
+### Correlation between methylation and weight
+```{r}
+tail_DHT <- capsule_tail %>% filter(Treatment=="C-DHT")
+cor.test(tail_DHT$CG.methylation, tail_DHT$Weight)
+
+tail_Control <- capsule_tail %>% filter(Treatment=="Control")
+cor.test(tail_Control$CG.methylation, tail_Control$Weight)
+```
+
+
+# Muscle
+
+## Plot
+```{r}
+DHTmuscle <- ggplot(capsule_muscle, aes(x=Treatment, y=CG.methylation, colour=Treatment)) +
+  geom_boxplot(varwidth=T) + 
+  geom_point(size=5, alpha=4/6) +
+  labs(title="Muscle", 
+       x="Treatment",
+       y="Methylation (%)") +
+  theme_light() +
+    scale_colour_manual(values = get_pal("Takahe")[c(1,2,4)]) +
+  theme(legend.position = "none") + 
+  theme(text = element_text(size = 20)) 
+DHTmuscle
+```
+
+## Statistics 
+
+### T test
+```{r}
+t.test(capsule_muscle$CG.methylation~capsule_muscle$Treatment)
+```
+
+
+
+### Correlation between methylation and weight
+```{r}
+muscle_DHT <- capsule_muscle %>% filter(Treatment=="C-DHT")
+cor.test(muscle_DHT$CG.methylation, muscle_DHT$Weight)
+
+muscle_Control <- capsule_muscle %>% filter(Treatment=="Control")
+cor.test(muscle_Control$CG.methylation, muscle_Control$Weight)
+```
+
+
+# Kidney
+
+## Plot
+```{r}
+DHTkidney <- ggplot(capsule_kidney, aes(x=Treatment, y=CG.methylation, colour=Treatment)) +
+  geom_boxplot(varwidth=T) + 
+  geom_point(size=5, alpha=4/6) +
+  labs(title="Kidney", 
+       x="Treatment",
+       y="Methylation (%)") +
+  theme_light() +
+    scale_colour_manual(values = get_pal("Takahe")[c(1,2)]) +
+  theme(legend.position = "none") + 
+  theme(text = element_text(size = 20))
+DHTkidney
+```
+
+## Statistics 
+
+### T test
+```{r}
+t.test(capsule_kidney$CG.methylation~capsule_kidney$Treatment)
+
+```
+
+
+### Correlation between methylation and weight
+```{r}
+kidney_DHT <- capsule_kidney %>% filter(Treatment=="C-DHT")
+cor.test(kidney_DHT$CG.methylation, kidney_DHT$Weight)
+
+kidney_Control <- capsule_kidney %>% filter(Treatment=="Control")
+cor.test(kidney_Control$CG.methylation, kidney_Control$Weight)
+```
+
+
+
+# Liver
+
+## Plot
+```{r}
+DHTliver <- ggplot(capsule_liver, aes(x=Treatment, y=CG.methylation, colour=Treatment)) +
+  geom_boxplot(varwidth=T) + 
+  geom_point(size=5, alpha=4/6) +
+  labs(title="Liver", 
+       x="Treatment",
+       y="Methylation (%)") +
+  theme_light() +
+    scale_colour_manual(values = get_pal("Takahe")[c(1,2)]) +
+  theme(legend.position = "none") + 
+  theme(text = element_text(size = 20)) 
+DHTliver
+```
+
+## Statistics 
+
+### T test
+```{r}
+t.test(capsule_liver$CG.methylation~capsule_liver$Treatment)
+
+```
+
+
+### Correlation between methylation and weight
+```{r}
+liver_DHT <- capsule_liver %>% filter(Treatment=="C-DHT")
+cor.test(liver_DHT$CG.methylation, liver_DHT$Weight)
+
+liver_Control <- capsule_liver %>% filter(Treatment=="Control")
+cor.test(liver_Control$CG.methylation, liver_Control$Weight)
+```
+
+# Plot together
+
+```{r}
+capsuleDHTdata$Tissue <- factor(capsuleDHTdata$Tissue, levels = c("Muscle", "Tail", "Kidney", "Ear", "Liver"))
+
+# Plot
+DHT_combined <- ggplot(capsuleDHTdata, aes(x=Tissue, y=CG.methylation, colour=Treatment)) +
+  geom_boxplot(varwidth=T) + 
+  geom_point(size=5, alpha=4/6, position=position_dodge(width=0.75)) +
+  labs(title="  ", 
+       x="Tissue",
+       y="Methylation (%)") +
+  theme_light() +
+  geom_signif(y_position = c(95, 95, 95, 95), xmin = c(0.75, 1.75, 2.75, 3.75), xmax = c(1.25, 2.25, 3.25, 4.25), tip_length = 0.02, annotation = c("***", "***", "**", "***"), colour="black", textsize = 5) +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2)]) +
+theme(legend.position = c(0.87, 0.20),
+        legend.background = element_rect(fill = "white", color = "black")) +  theme(text = element_text(size = 10)) +
+  guides(colour = guide_legend(title = "Treatment", nrow = 1)) +
+  ylim(30,100) 
+
+DHT_combined
+```
+
+
+
+
+# Apply it to the clock
+# Data preparation
+```{r}
+mouse_array_data <- read.csv("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Data/Mouse_ArrayData_Full_TailMuscle.csv")
+
+# Setting AndroAge with predicted time of puberty onset = age minus 6 weeks, adjust to 0 where negative
+mouse_array_data$YPMP <- mouse_array_data$Age-0.115068
+mouse_array_data$YPMP[mouse_array_data$Sex=="F"] <- 0
+mouse_array_data$YPMP[mouse_array_data$YPMP < 0] <- 0
+
+# Change sex labels
+mouse_array_data$Sex[mouse_array_data$Sex=="F"] <- "Female"
+mouse_array_data$Sex[mouse_array_data$Sex=="M"] <- "Male"
+
+# Subset by tissue
+mouse_array_muscle <- mouse_array_data %>% filter(Tissue=="Muscle")
+mouse_array_tail <- mouse_array_data %>% filter(Tissue=="Tail")
+```
+
+# I also need to add to my new data: 
+- a column with the corrected beta value in it headed "cg21524116" in my new data
+- AgeYears (base this off the existing AgeDays column)
+- YPMP values
+
+```{r}
+capsule_tail$cg21524116 <- capsule_tail$Beta_corrected
+capsule_tail$AgeYears <- capsule_tail$AgeDays/365
+capsule_tail$YPMP <- capsule_tail$AgeYears-0.115068
+capsule_tail$YPMP[capsule_tail$Sex=="Female"] <- 0
+capsule_tail$YPMP[capsule_tail$YPMP < 0] <- 0
+```
+
+
+##### Tail #####
+
+# Fit androgen clock to mouse tail
+```{r}
+male_mouse_array_tail <- mouse_array_tail %>% filter(Sex=="Male")
+
+tail_model <- lm(YPMP ~ cg21524116, data=male_mouse_array_tail) 
+summary(tail_model)
+```
+
+# Now, to apply it to the new data.
+
+```{r}
+capsule_tail$Model_AndroAge_Tailclock <- predict(tail_model, newdata = capsule_tail)
+
+capsule_tail_model <- as.data.frame(Metrics::mdae(actual=capsule_tail$YPMP, predicted=capsule_tail$Model_AndroAge_Tailclock))
+capsule_tail_model
+# 0.485
+```
+
+```{r}
+capsule_tail$AndroAgeAccel <- capsule_tail$Model_AndroAge_Tailclock-capsule_tail$YPMP
+```
+
+
+```{r}
+capsule_tail_DHT <- capsule_tail %>% filter(Treatment=="C-DHT")
+capsule_tail_control <- capsule_tail %>% filter(Treatment=="Control")
+```
+
+
+```{r}
+Metrics::mdae(actual=capsule_tail_DHT$YPMP, predicted=capsule_tail_DHT$Model_AndroAge_Tailclock)
+# 1.244
+
+mean(capsule_tail_DHT$Model_AndroAge_Tailclock)
+# 0.991
+```
+
+```{r}
+Metrics::mdae(actual=capsule_tail_control$YPMP, predicted=capsule_tail_control$Model_AndroAge_Tailclock)
+# 0.400
+
+mean(capsule_tail_control$Model_AndroAge_Tailclock)
+# -0.437
+```
+# Mann whitney p value
+```{r}
+wilcox.test(capsule_tail$Model_AndroAge_Tailclock~capsule_tail$Treatment)
+# p=0.0003108
+```
+
+# Plot
+
+```{r}
+d2tail <- capsule_tail %>%
+  dplyr::group_by(Treatment) %>%
+  dplyr::summarise(
+    mean = mean(Model_AndroAge_Tailclock, na.rm = TRUE),
+    sd = sd(Model_AndroAge_Tailclock, na.rm = TRUE)
+  )
+```
+
+```{r}
+AndroAgeTail <- ggplot(d2tail, aes(x=Treatment, y=mean)) + 
+  geom_bar(stat = "identity", fill="lightgrey", colour="black") + 
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=0.5) + 
+  geom_point(capsule_tail, mapping = aes(x=Treatment, y=Model_AndroAge_Tailclock, colour=Treatment), size=4, alpha=1/2) +
+  ylab("AndroAge (Years)") + theme_classic() + geom_hline(yintercept=0) + 
+  theme_light() +
+  ggtitle("Chronic DHT Tail") +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2)]) +
+  theme(legend.position="none", plot.title = element_text(hjust = 0.5))+
+  geom_signif(y_position = c(2.15), xmin = c(1), xmax = c(2), tip_length = 0.02, annotation = c("***"), colour="black", textsize = 5) +
+  theme(text = element_text(size = 10)) +
+  ylim(-1, 2.7)
+AndroAgeTail
+```
+
+##### Muscle #####
+
+```{r}
+capsule_muscle$cg21524116 <- capsule_muscle$Beta_corrected
+capsule_muscle$AgeYears <- capsule_muscle$AgeDays/365
+capsule_muscle$YPMP <- capsule_muscle$AgeYears-0.115068
+capsule_muscle$YPMP[capsule_muscle$Sex=="Female"] <- 0
+capsule_muscle$YPMP[capsule_muscle$YPMP < 0] <- 0
+```
+
+```{r}
+male_mouse_array_muscle <- mouse_array_muscle %>% filter(Sex=="Male")
+
+muscle_model <- lm(YPMP ~ cg21524116, data=male_mouse_array_muscle) 
+summary(muscle_model)
+```
+
+# Now, to apply it to the new data.
+
+```{r}
+capsule_muscle$Model_AndroAge_Muscleclock <- predict(muscle_model, newdata = capsule_muscle)
+
+capsule_data_model_muscleclock <- as.data.frame(Metrics::mdae(actual=capsule_muscle$YPMP, predicted=capsule_muscle$Model_AndroAge_Muscleclock))
+capsule_data_model_muscleclock
+# 0.957
+```
+
+```{r}
+capsule_muscle$AndroAgeAccel <- capsule_muscle$Model_AndroAge_Muscleclock-capsule_muscle$YPMP
+```
+
+
+```{r}
+capsule_muscle_DHT <- capsule_muscle %>% filter(Treatment=="C-DHT")
+capsule_muscle_control <- capsule_muscle %>% filter(Treatment=="Control")
+```
+
+
+```{r}
+as.data.frame(Metrics::mdae(actual=capsule_muscle_DHT$YPMP, predicted=capsule_muscle_DHT$Model_AndroAge_Muscleclock))
+# 1.552
+
+mean(capsule_muscle_DHT$Model_AndroAge_Muscleclock)
+# 1.591
+```
+
+```{r}
+as.data.frame(Metrics::mdae(actual=capsule_muscle_control$YPMP, predicted=capsule_muscle_control$Model_AndroAge_Muscleclock))
+# 0.083
+
+mean(capsule_muscle_control$Model_AndroAge_Muscleclock)
+# -0.204
+```
+# Mann whitney p value
+```{r}
+wilcox.test(capsule_muscle$Model_AndroAge_Muscleclock~capsule_muscle$Treatment)
+# p=0.0003108
+```
+
+
+# Plot
+
+```{r}
+d2muscle <- capsule_muscle %>%
+  dplyr::group_by(Treatment) %>%
+  dplyr::summarise(
+    mean = mean(Model_AndroAge_Muscleclock, na.rm = TRUE),
+    sd = sd(Model_AndroAge_Muscleclock, na.rm = TRUE)
+  )
+```
+
+```{r}
+AndroAgeMuscle <- ggplot(d2muscle, aes(x=Treatment, y=mean)) + 
+  geom_bar(stat = "identity", fill="lightgrey", colour="black") + 
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=0.5) + 
+  geom_point(capsule_muscle, mapping = aes(x=Treatment, y=Model_AndroAge_Muscleclock, colour=Treatment), size=4, alpha=1/2) +
+  ylab("AndroAge (Years)") + theme_classic() + geom_hline(yintercept=0) + 
+  theme_light() +
+  ggtitle("Chronic DHT Muscle") +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2)]) +
+  theme(legend.position="none", plot.title = element_text(hjust = 0.5)) +
+  geom_signif(y_position = c(2.15), xmin = c(1), xmax = c(2), tip_length = 0.02, annotation = c("***"), colour="black", textsize = 5) +
+  theme(text = element_text(size = 10)) +
+  ylim(-1, 2.7)
+AndroAgeMuscle
+```
+
+# ARKO samples
+
+```{r}
+ARKOdata$FullDetailsBrief <- factor(ARKOdata$FullDetailsBrief, 
+                                     levels = c("MaleWT", "FemaleWT", "MaleKO", "MaleKO+T"))
+
+ARKO_plot_full <- ggplot(ARKOdata, aes(x=FullDetailsBrief, y=CG.methylation, colour=FullDetailsBrief)) +
+  geom_boxplot(varwidth=T) + 
+  geom_jitter(size=5, width=0.01, alpha=4/5) +
+  labs(title="", 
+       x="Treatment",
+       y="Methylation (%)") +
+  theme_light() +
+  theme(legend.position = "none") + 
+  #theme(text = element_text(size = 20)) +
+  scale_colour_manual(values = get_pal("Takahe")[c(2,1,4,3)]) +
+  geom_signif(y_position = c(80), xmin = c(1), xmax = c(2), tip_length = c(0.03, 0.03), annotation = c(""), textsize = 8) +
+  geom_signif(y_position = c(93.5), xmin = c(1), xmax = c(3), tip_length = c(0.03, 0.03), annotation = c(""), textsize = 8) +
+  geom_signif(y_position = c(98), xmin = c(1), xmax = c(4), tip_length = c(0.03, 0.03), annotation = c(""), textsize = 8) +
+  geom_signif(y_position = c(84.5), xmin = c(3), xmax = c(4), tip_length = c(0.03, 0.03), annotation = c(""), textsize = 8) +
+  geom_signif(y_position = c(89), xmin = c(2), xmax = c(3), tip_length = c(0.03, 0.03), annotation = c(""), textsize = 8) +
+  ylim(25,100) + 
+  geom_text(aes(x = 1.5, y = 81, label = "***"), size = 6, colour="black") +
+  geom_text(aes(x = 2.5, y = 90, label = "*"), size = 6, colour="black") +
+  geom_text(aes(x = 3.5, y = 85.5, label = "*"), size = 6, colour="black") +
+  geom_text(aes(x = 2, y = 94.5, label = "***"), size = 6, colour="black") +
+  geom_text(aes(x = 3, y = 99, label = "***"), size = 6, colour="black") 
+
+ARKO_plot_full
+
+ggsave("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Revision/FinalFigures/FigureSX_ARKOMethylation.png", ARKO_plot_full, width=8,height=5, dpi=1000)
+```
+
+# maybe this should be plot by age??
+```{r}
+ARKO_plot_age <- ggplot(ARKOdata, aes(x=AgeDays, y=CG.methylation, colour=FullDetailsBrief)) +
+  geom_point(size=5, alpha=4/5) +
+   labs(title="", 
+       x="Age (Days)",
+       y="Methylation (%)",
+       colour="Group") +
+  theme_light() +
+  geom_smooth(method=lm, se=F) +
+  facet_wrap(~FullDetailsBrief) +
+  scale_colour_manual(values = get_pal("Takahe")[c(2,1,4,3)]) +
+  theme(legend.position = "none")
+ARKO_plot_age
+```
+
+```{r}
+ARKO_methylation <- cowplot::plot_grid(ARKO_plot_full, ARKO_plot_age, nrow=2, labels=c("A", "B"))
+ARKO_methylation
+
+ggsave("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Revision/FinalFigures/FigureSX_ARKOMethylation_2.png", ARKO_methylation, width=8,height=10, dpi=1000)
+```
+
+
+# t tests for all comparisons
+```{r}
+ARKO_MaleKO_MaleKOT <- ARKOdata %>% filter(FullDetailsBrief %in% c("MaleKO", "MaleKO+T"))
+ARKO_MaleKO_FemaleWT <- ARKOdata %>% filter(FullDetailsBrief %in% c("MaleKO", "FemaleWT"))
+ARKO_MaleKO_MaleWT <- ARKOdata %>% filter(FullDetailsBrief %in% c("MaleKO", "MaleWT"))
+ARKO_MaleKOT_FemaleWT <- ARKOdata %>% filter(FullDetailsBrief %in% c("MaleKO+T", "FemaleWT"))
+ARKO_MaleKOT_MaleWT <- ARKOdata %>% filter(FullDetailsBrief %in% c("MaleKO+T", "MaleWT"))
+ARKO_FemaleWT_MaleWT <- ARKOdata %>% filter(FullDetailsBrief %in% c("FemaleWT", "MaleWT"))
+```
+
+# Male KO vs. Male KO+T
+```{r}
+t.test(ARKO_MaleKO_MaleKOT$CG.methylation~ARKO_MaleKO_MaleKOT$FullDetailsBrief)
+```
+
+# Male KO vs. Female WT
+```{r}
+t.test(ARKO_MaleKO_FemaleWT$CG.methylation~ARKO_MaleKO_FemaleWT$FullDetailsBrief)
+```
+
+# Male KO vs. Male WT
+```{r}
+t.test(ARKO_MaleKO_MaleWT$CG.methylation~ARKO_MaleKO_MaleWT$FullDetailsBrief)
+```
+
+# Male KO+T vs. Female WT
+```{r}
+t.test(ARKO_MaleKOT_FemaleWT$CG.methylation~ARKO_MaleKOT_FemaleWT$FullDetailsBrief)
+```
+
+# Male KO+T vs. Male WT
+```{r}
+t.test(ARKO_MaleKOT_MaleWT$CG.methylation~ARKO_MaleKOT_MaleWT$FullDetailsBrief)
+```
+
+# Female WT vs. Male WT
+```{r}
+t.test(ARKO_FemaleWT_MaleWT$CG.methylation~ARKO_FemaleWT_MaleWT$FullDetailsBrief)
+```
+
+
+## now, apply the data to the androgen clock
+# I need to add to my new data: 
+- a column with the beta value in it headed "cg21524116" in my new data
+- AgeYears (base this off the existing AgeDays column)
+- YPMP values
+
+```{r}
+ARKOdata$cg21524116 <- ARKOdata$Beta_corrected
+ARKOdata$AgeYears <- ARKOdata$AgeDays/365
+ARKOdata$YPMP <- ARKOdata$AgeYears-0.115068
+ARKOdata$YPMP[ARKOdata$Sex=="Female"] <- 0
+ARKOdata$YPMP[ARKOdata$YPMP < 0] <- 0
+```
+
+##### Muscle #####
+# Now, to apply it to the new data.
+
+```{r}
+ARKOdata$Model_AndroAge_Muscleclock <- predict(muscle_model, newdata = ARKOdata)
+
+Metrics::mdae(actual=ARKOdata$YPMP, predicted=ARKOdata$Model_AndroAge_Muscleclock)
+# 0.634
+```
+
+```{r}
+ARKOdata$Residual <- ARKOdata$Model_AndroAge_Muscleclock-ARKOdata$YPMP
+```
+
+
+```{r}
+ARKO_MaleKO <- ARKOdata %>% filter(FullDetailsBrief=="MaleKO")
+ARKO_MaleKOT <- ARKOdata %>% filter(FullDetailsBrief=="MaleKO+T")
+ARKO_MaleWT <- ARKOdata %>% filter(FullDetailsBrief=="MaleWT")
+ARKO_FemaleWT <- ARKOdata %>% filter(FullDetailsBrief=="FemaleWT")
+```
+
+
+```{r}
+Metrics::mdae(actual=ARKOdata$YPMP, predicted=ARKOdata$Model_AndroAge_Muscleclock)
+# 0.634
+```
+
+```{r}
+Metrics::mdae(actual=ARKO_MaleKO$YPMP, predicted=ARKO_MaleKO$Model_AndroAge_Muscleclock)
+# 0.909
+```
+
+```{r}
+Metrics::mdae(actual=ARKO_MaleKOT$YPMP, predicted=ARKO_MaleKOT$Model_AndroAge_Muscleclock)
+# 0.565
+```
+
+```{r}
+Metrics::mdae(actual=ARKO_MaleWT$YPMP, predicted=ARKO_MaleWT$Model_AndroAge_Muscleclock)
+# 1.10
+```
+
+```{r}
+Metrics::mdae(actual=ARKO_FemaleWT$YPMP, predicted=ARKO_FemaleWT$Model_AndroAge_Muscleclock)
+# 0.27
+```
+
+```{r}
+ARKO_KWtest <- kruskal.test(Model_AndroAge_Muscleclock ~ FullDetailsBrief, data = ARKOdata)
+
+if (ARKO_KWtest$p.value < 0.05) {
+    ARKO_Dunn <- dunnTest(Model_AndroAge_Muscleclock ~ FullDetailsBrief, data = ARKOdata, method = "bh")
+    print(ARKO_Dunn)
+}
+```
+
+
+
+#### plotting
+```{r}
+d2_ARKO_aa <- ARKOdata %>%
+  dplyr::group_by(FullDetailsBrief) %>%
+  dplyr::summarise(
+    mean = mean(Model_AndroAge_Muscleclock, na.rm = TRUE),
+    sd = sd(Model_AndroAge_Muscleclock, na.rm = TRUE)
+  )
+```
+
+```{r}
+ARKOAgeAccel_anno2 <- ggplot(d2_ARKO_aa, aes(x=FullDetailsBrief, y=mean)) + 
+  geom_bar(stat = "identity", fill="lightgrey", colour="black") + 
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=0.5) + 
+  geom_point(ARKOdata, mapping = aes(x=FullDetailsBrief, y=Model_AndroAge_Muscleclock, colour=FullDetailsBrief), size=4, alpha=1/2) +
+  ylab("AndroAge (Years)") + theme_classic() + geom_hline(yintercept=0) + 
+  theme_light() +
+  ggtitle("ARKO Muscle") +
+  xlab("Treatment group") +
+  scale_colour_manual(values = get_pal("Takahe")[c(2,1,4,3)]) +
+  theme(legend.position="none") +
+  geom_signif(y_position = c(2.6), xmin = c(1), xmax = c(4), tip_length = c(0.02, 0.02), annotation = c(""), textsize = 5) +
+  geom_signif(y_position = c(2.35), xmin = c(1), xmax = c(3), tip_length = c(0.02, 0.02), annotation = c(""), textsize = 5) +
+  geom_signif(y_position = c(2.1), xmin = c(1), xmax = c(2), tip_length = c(0.02, 0.02), annotation = c(""), textsize = 5) +
+  geom_text(aes(x = 1.5, y = 2.15, label = "**"), size = 6, colour="black") +
+  geom_text(aes(x = 2, y = 2.4, label = "***"), size = 6, colour="black") +
+  geom_text(aes(x = 2.5, y = 2.65, label = "**"), size = 6, colour="black") +
+  theme(text = element_text(size = 10), plot.title = element_text(hjust = 0.5)) +
+  ylim(-1,2.7)
+
+ARKOAgeAccel_anno2
+
+ggsave("/Users/victoriasugrue/Dropbox (Otago University)/ARKOAgeAccel_anno2_fullannotations.png", ARKOAgeAccel_anno2, width=6,height=6, dpi=1000)
+```
+
+
+# Prenatal exposure mice
+
+```{r}
+prenatal_plot <- ggplot(prenatalDHTdata, aes(x=Treatment, y=CG.methylation, colour=Treatment)) +
+  geom_boxplot(varwidth=T) + 
+  geom_point(size=5, alpha=4/6) +
+  labs(title="PNA mice", 
+       x="Treatment",
+       y="Methylation (%)") +
+  theme_light() +
+  theme(legend.position = "none") + 
+  #theme(text = element_text(size = 15)) +
+  ylim(55,85) +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2)])
+
+prenatal_plot
+
+ggsave("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Revision/FinalFigures/FigureSX_PNAMethylation.png", prenatal_plot, width=4,height=3, dpi=1000)
+```
+
+```{r}
+t.test(prenatalDHTdata$CG.methylation~prenatalDHTdata$Treatment)
+```
+
+
+```{r}
+prenatalDHTdata$cg21524116 <- prenatalDHTdata$Beta_corrected
+prenatalDHTdata$AgeYears <- prenatalDHTdata$AgeDays/365
+prenatalDHTdata$YPMP <- prenatalDHTdata$AgeYears-0.115068
+prenatalDHTdata$Sex <- "Female"
+prenatalDHTdata$YPMP[prenatalDHTdata$Sex=="Female"] <- 0
+prenatalDHTdata$YPMP[prenatalDHTdata$YPMP < 0] <- 0
+prenatalDHTdata <- prenatalDHTdata %>%
+  mutate(Treatment = ifelse(Treatment == "DHT", "PNA", Treatment))
+
+
+prenatalDHTdata$Model_AndroAge_Muscleclock <- predict(muscle_model, newdata = prenatalDHTdata)
+
+Metrics::mdae(actual=prenatalDHTdata$YPMP, predicted=prenatalDHTdata$Model_AndroAge_Muscleclock)
+# 0.24
+```
+
+```{r}
+prenatalDHTdata$AndroAgeAccel <- prenatalDHTdata$Model_AndroAge_Muscleclock-prenatalDHTdata$YPMP
+```
+
+
+```{r}
+prenatalDHT <- prenatalDHTdata %>% filter(Treatment=="PNA") 
+prenatalControl <- prenatalDHTdata %>% filter(Treatment=="Control")
+```
+
+
+```{r}
+Metrics::mdae(actual=prenatalDHT$YPMP, predicted=prenatalDHT$Model_AndroAge_Muscleclock)
+# 0.241
+```
+
+```{r}
+Metrics::mdae(actual=prenatalControl$YPMP, predicted=prenatalControl$Model_AndroAge_Muscleclock)
+# 0.247
+```
+
+```{r}
+prenatalDHTdata$Residual <- prenatalDHTdata$Model_AndroAge_Muscleclock-prenatalDHTdata$YPMP
+
+wilcox.test(prenatalDHTdata$Model_AndroAge_Muscleclock~prenatalDHTdata$Treatment)
+
+wilcox.test(prenatalDHTdata$Residual~prenatalDHTdata$Treatment)
+```
+
+```{r}
+d2prenatal <- prenatalDHTdata %>%
+  dplyr::group_by(Treatment) %>%
+  dplyr::summarise(
+    mean = mean(Model_AndroAge_Muscleclock, na.rm = TRUE),
+    sd = sd(Model_AndroAge_Muscleclock, na.rm = TRUE)
+  )
+```
+
+```{r}
+AndroAgePrenatal <- ggplot(d2prenatal, aes(x=Treatment, y=mean)) + 
+  geom_bar(stat = "identity", fill="lightgrey", colour="black") + 
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=0.5) + 
+  geom_point(prenatalDHTdata, mapping = aes(x=Treatment, y=prenatalDHTdata$Model_AndroAge_Muscleclock, colour=Treatment), size=4, alpha=1/2) +
+  ylab("AndroAge (Years)") + theme_classic() + geom_hline(yintercept=0) + 
+  theme_light() +
+  ggtitle("Prenatal DHT Muscle") +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2)]) +
+  theme(legend.position="none", plot.title = element_text(hjust = 0.5)) +
+  theme(text = element_text(size = 10)) +
+  ylim(-1,2.7)
+AndroAgePrenatal
+```
+
+
+## plot all things together
+
+```{r}
+v1 <- cowplot::plot_grid(AndroAgeTail, AndroAgeMuscle, AndroAgePrenatal, nrow=1, labels=c("B", "C", "D"))
+v1
+
+v2 <- cowplot::plot_grid(DHT_combined, v1, nrow=2, labels=c("A"))
+v2
+
+```
+
+
+# Plot together 
+```{r}
+#top <- cowplot::plot_grid(DHT_combined, AndroAgeTail, AndroAgeMuscle, nrow=1, rel_widths = c(1, 0.4, 0.4))
+#top
+
+#bottom <- cowplot::plot_grid(AndroAgePrenatal, ARKOAgeAccel_anno2, nrow=1, rel_widths = c(0.3, 1))
+#bottom
+
+#both <- cowplot::plot_grid(top, bottom, nrow=2, rel_heights = c(1,1))
+#both
+
+#ggsave("/Users/victoriasugrue/Dropbox (Otago University)/checkfig4layout_v4_corrected.png", both, width=12,height=8, dpi=1000)
+#ggsave("/Users/victoriasugrue/Dropbox (Otago University)/checkfig4layout_v4.1_corrected.png", both, width=6,height=8, dpi=1000)
+
+```
+
+# all plot codes to edit 
+```{r}
+DHT_combined2 <- ggplot(capsuleDHTdata, aes(x=Tissue, y=CG.methylation, colour=Treatment)) +
+  geom_boxplot(varwidth=T) + 
+  geom_point(size=5, alpha=4/6, position=position_dodge(width=0.75)) +
+  labs(title="  ", 
+       x="Tissue",
+       y="Methylation (%)") +
+  theme_light() +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2)]) +
+  ylim(30,100) +
+  geom_signif(y_position = c(95), xmin = c(0.75), xmax = c(1.25), tip_length = c(0.02, 0.02), annotation = c(""), textsize = 5, colour="black") +
+  geom_signif(y_position = c(95), xmin = c(1.75), xmax = c(2.25), tip_length = c(0.02, 0.02), annotation = c(""), textsize = 5, colour="black") +
+  geom_signif(y_position = c(95), xmin = c(2.75), xmax = c(3.25), tip_length = c(0.02, 0.02), annotation = c(""), textsize = 5, colour="black") +
+  geom_signif(y_position = c(95), xmin = c(3.75), xmax = c(4.25), tip_length = c(0.02, 0.02), annotation = c(""), textsize = 5, colour="black") +
+  geom_text(aes(x = 1, y = 96.5, label = "***"), size = 6, colour="black") +
+  geom_text(aes(x = 2, y = 96.5, label = "***"), size = 6, colour="black") +
+  geom_text(aes(x = 3, y = 96.5, label = "**"), size = 6, colour="black") +
+  geom_text(aes(x = 4, y = 96.5, label = "***"), size = 6, colour="black") 
+
+DHT_combined2
+```
+
+```{r}
+AndroAgeTail <- ggplot(d2tail, aes(x=Treatment, y=mean)) + 
+  geom_bar(stat = "identity", fill="lightgrey", colour="black") + 
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=0.5) + 
+  geom_point(capsule_tail, mapping = aes(x=Treatment, y=Model_AndroAge_Tailclock, colour=Treatment), size=4, alpha=1/2) +
+  ylab("AndroAge (Years)") + theme_classic() + geom_hline(yintercept=0) + 
+  theme_light() +
+  ggtitle("C-DHT Tail") +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2)]) +
+  theme(legend.position="none", plot.title = element_text(hjust = 0.5))+
+  theme(text = element_text(size = 10)) +
+  geom_signif(y_position = c(2.6), xmin = c(1), xmax = c(2), tip_length = c(0.02, 0.02), annotation = c(""), textsize = 5) +
+  geom_text(aes(x = 1.5, y = 2.65, label = "***"), size = 6, colour="black") +
+  ylim(-1, 2.7)
+AndroAgeTail
+```
+
+```{r}
+AndroAgeMuscle <- ggplot(d2muscle, aes(x=Treatment, y=mean)) + 
+  geom_bar(stat = "identity", fill="lightgrey", colour="black") + 
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=0.5) + 
+  geom_point(capsule_muscle, mapping = aes(x=Treatment, y=Model_AndroAge_Muscleclock, colour=Treatment), size=4, alpha=1/2) +
+  ylab("AndroAge (Years)") + theme_classic() + geom_hline(yintercept=0) + 
+  theme_light() +
+  ggtitle("C-DHT Muscle") +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2)]) +
+  theme(legend.position="none", plot.title = element_text(hjust = 0.5)) +
+  theme(text = element_text(size = 10)) +
+  geom_signif(y_position = c(2.6), xmin = c(1), xmax = c(2), tip_length = c(0.02, 0.02), annotation = c(""), textsize = 5) +
+  geom_text(aes(x = 1.5, y = 2.65, label = "***"), size = 6, colour="black") +
+  ylim(-1, 2.7)
+AndroAgeMuscle
+```
+
+```{r}
+AndroAgePrenatal <- ggplot(d2prenatal, aes(x=Treatment, y=mean)) + 
+  geom_bar(stat = "identity", fill="lightgrey", colour="black") + 
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=0.5) + 
+  geom_point(prenatalDHTdata, mapping = aes(x=Treatment, y=prenatalDHTdata$Model_AndroAge_Muscleclock, colour=Treatment), size=4, alpha=1/2) +
+  ylab("AndroAge (Years)") + theme_classic() + geom_hline(yintercept=0) + 
+  theme_light() +
+  ggtitle("PNA Muscle") +
+  scale_colour_manual(values = get_pal("Takahe")[c(1,2)]) +
+  theme(legend.position="none", plot.title = element_text(hjust = 0.5)) +
+  theme(text = element_text(size = 10)) +
+  ylim(-1,2.7)
+AndroAgePrenatal
+```
+
+```{r}
+ARKOAgeAccel_anno2 <- ggplot(d2_ARKO_aa, aes(x=FullDetailsBrief, y=mean)) + 
+  geom_bar(stat = "identity", fill="lightgrey", colour="black") + 
+  geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=0.5) + 
+  geom_point(ARKOdata, mapping = aes(x=FullDetailsBrief, y=Model_AndroAge_Muscleclock, colour=FullDetailsBrief), size=4, alpha=1/2) +
+  ylab("AndroAge (Years)") + theme_classic() + geom_hline(yintercept=0) + 
+  theme_light() +
+  ggtitle("ARKO Muscle") +
+  xlab("Treatment group") +
+  scale_colour_manual(values = get_pal("Takahe")[c(2,1,4,3)]) +
+  theme(legend.position="none") +
+  geom_signif(y_position = c(2.6), xmin = c(1), xmax = c(4), tip_length = c(0.02, 0.02), annotation = c(""), textsize = 5) +
+  geom_signif(y_position = c(2.35), xmin = c(1), xmax = c(3), tip_length = c(0.02, 0.02), annotation = c(""), textsize = 5) +
+  geom_signif(y_position = c(2.1), xmin = c(1), xmax = c(2), tip_length = c(0.02, 0.02), annotation = c(""), textsize = 5) +
+  geom_text(aes(x = 1.5, y = 2.15, label = "**"), size = 6, colour="black") +
+  geom_text(aes(x = 2, y = 2.4, label = "***"), size = 6, colour="black") +
+  geom_text(aes(x = 2.5, y = 2.65, label = "**"), size = 6, colour="black") +
+  theme(text = element_text(size = 10), plot.title = element_text(hjust = 0.5)) +
+  ylim(-1,2.7)
+
+ARKOAgeAccel_anno2
+```
+
+
+
+
+```{r}
+bottom2 <- cowplot::plot_grid(AndroAgeTail, AndroAgeMuscle, AndroAgePrenatal, ARKOAgeAccel_anno2, nrow=1, rel_widths=c(0.5, 0.5, 0.5, 0.8), labels=c("B", "C", "D", "E"))
+bottom2
+
+figure4 <- cowplot::plot_grid(DHT_combined2, bottom2, nrow=2, rel_heights = c(0.8, 1), labels=c("A"))
+figure4
+
+ggsave("/Users/victoriasugrue/Dropbox (Otago University)/Androgen_Clock/Manuscript/Revision/FinalFigures/Figure4.png", figure4, width=10,height=8, dpi=1000)
+```
